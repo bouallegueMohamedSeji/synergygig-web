@@ -11,7 +11,7 @@ use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: TrainingCourseRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'training_course')]
+#[ORM\Table(name: 'training_courses')]
 class TrainingCourse
 {
     use TimestampTrait;

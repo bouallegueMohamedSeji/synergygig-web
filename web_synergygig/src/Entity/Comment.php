@@ -11,7 +11,7 @@ use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: CommentRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'comment')]
+#[ORM\Table(name: 'comments')]
 class Comment
 {
     use TimestampTrait;

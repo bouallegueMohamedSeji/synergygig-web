@@ -12,7 +12,7 @@ use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: ProjectRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'project')]
+#[ORM\Table(name: 'projects')]
 class Project
 {
     use TimestampTrait;

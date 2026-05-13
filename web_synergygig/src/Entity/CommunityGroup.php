@@ -11,7 +11,7 @@ use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: CommunityGroupRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'community_group')]
+#[ORM\Table(name: 'community_groups')]
 class CommunityGroup
 {
     use TimestampTrait;

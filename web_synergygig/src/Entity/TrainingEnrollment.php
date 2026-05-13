@@ -9,7 +9,7 @@ use Doctrine\Common\Collections\Collection;
 use App\Repository\TrainingEnrollmentRepository;
 
 #[ORM\Entity(repositoryClass: TrainingEnrollmentRepository::class)]
-#[ORM\Table(name: 'training_enrollment')]
+#[ORM\Table(name: 'training_enrollments')]
 class TrainingEnrollment
 {
     #[ORM\Id]

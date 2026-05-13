@@ -16,7 +16,7 @@ use App\Entity\Embeddable\Email;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'app_user')]
+#[ORM\Table(name: 'user')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     use TimestampTrait;

@@ -13,7 +13,7 @@ use App\Entity\Embeddable\Money;
 
 #[ORM\Entity(repositoryClass: OfferRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(name: 'offer')]
+#[ORM\Table(name: 'offers')]
 class Offer
 {
     use TimestampTrait;
