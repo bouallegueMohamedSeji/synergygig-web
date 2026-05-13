@@ -24,7 +24,7 @@ class ApiTaskController extends AbstractController
 
         $repo = $em->getRepository(Task::class);
         if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_HR')) {
-            $tasks = $repo->findBy([], ['id' => 'DESC']);
+            $tasks = $repo->findBy([], ['id' => 'DESC'], 100);
         } elseif ($this->isGranted('ROLE_PROJECT_OWNER')) {
             $tasks = $repo->createQueryBuilder('t')
                 ->leftJoin('t.project', 'p')
@@ -123,7 +123,7 @@ class ApiTaskController extends AbstractController
         $task->setDescription(isset($data['description']) ? (string) $data['description'] : null);
         $task->setStatus($this->normalizeTaskStatus((string) ($data['status'] ?? 'TODO')));
         $task->setPriority($this->normalizePriority((string) ($data['priority'] ?? 'MEDIUM')));
-        $task->setCreatedAt(new \DateTimeImmutable());
+        $task->initCreatedAt();
 
         if (!empty($data['assigned_to'])) {
             $assignee = $em->getRepository(User::class)->find((int) $data['assigned_to']);
@@ -259,7 +259,7 @@ class ApiTaskController extends AbstractController
         $task->setReviewStatus($reviewStatus);
         $task->setReviewRating($reviewRating);
         $task->setReviewFeedback($reviewFeedback);
-        $task->setReviewDate(new \DateTimeImmutable());
+        $task->initReviewDate(new \DateTimeImmutable());
 
         if ($reviewStatus === 'APPROVED') {
             $task->setStatus('DONE');
@@ -341,6 +341,7 @@ class ApiTaskController extends AbstractController
         return in_array($normalized, $valid, true) ? $normalized : 'MEDIUM';
     }
 
+    /** @return array<string, mixed> */
     private function serializeTask(Task $task): array
     {
         return [

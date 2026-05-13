@@ -68,7 +68,7 @@ class NotificationController extends AbstractController
     #[Route('/{id}/delete', name: 'app_notification_delete', methods: ['POST'])]
     public function delete(Request $request, Notification $notification, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $notification->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $notification->getId(), (string) $request->request->get('_token'))) {
             $em->remove($notification);
             $em->flush();
             $this->addFlash('success', 'Notification deleted.');

@@ -2,6 +2,8 @@
 
 Welcome to the Symfony web version of **SynergyGig** — an HR & Workforce Management Platform.
 
+This `web_synergygig` folder contains the Symfony web application implementation, ready to be pushed as the web portion of the SynergyGig project.
+
 ## About This Project
 
 This is a complete rewrite of the [SynergyGig JavaFX Desktop Application](https://github.com/bouallegueMohamedSeji/synergygig) as a modern, scalable **web application** built with **Symfony 7.x**.

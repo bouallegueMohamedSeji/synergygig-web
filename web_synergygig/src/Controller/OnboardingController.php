@@ -29,7 +29,8 @@ class OnboardingController extends AbstractController
     public function toggle(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        $key = $data['key'] ?? '';
+        $data = is_array($data) ? $data : [];
+        $key = (string) ($data['key'] ?? '');
 
         $session = $request->getSession();
         $checked = $session->get('onboarding_checked', []);
@@ -58,7 +59,8 @@ class OnboardingController extends AbstractController
     public function ask(Request $request, AIService $ai): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-        $question = trim($data['question'] ?? '');
+        $data = is_array($data) ? $data : [];
+        $question = trim((string) ($data['question'] ?? ''));
 
         if (strlen($question) < 3) {
             return $this->json(['error' => 'Please enter a question.'], 422);
@@ -76,6 +78,9 @@ class OnboardingController extends AbstractController
         return $this->json(['answer' => $answer]);
     }
 
+    /**
+     * @return list<array{title: string, items: list<string>}>
+     */
     private function getChecklist(): array
     {
         return [

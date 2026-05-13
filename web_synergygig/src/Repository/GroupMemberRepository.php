@@ -6,6 +6,8 @@ use App\Entity\GroupMember;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/** @extends ServiceEntityRepository<GroupMember> */
+
 class GroupMemberRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,3 +17,5 @@ class GroupMemberRepository extends ServiceEntityRepository
 
     // Add custom methods as needed
 }
+
+

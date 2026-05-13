@@ -7,11 +7,17 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\TaskRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'tasks')]
 class Task
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -29,7 +35,7 @@ class Task
     }
 
     #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
-    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Project $project = null;
 
     public function getProject(): ?Project
@@ -44,7 +50,7 @@ class Task
     }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'assigned_to', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'assigned_to_id', referencedColumnName: 'id')]
     private ?User $assignedTo = null;
 
     public function getAssignedTo(): ?User
@@ -137,31 +143,6 @@ class Task
     {
         return $this->setDue_date($due_date);
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $submission_text = null;
 
@@ -295,15 +276,16 @@ class Task
         return $this->getReview_date();
     }
 
-    public function setReview_date(?\DateTimeInterface $review_date): self
+    /** @internal Timestamp — set once */
+    public function initReview_date(?\DateTimeInterface $review_date): self
     {
         $this->review_date = $review_date;
         return $this;
     }
 
-    public function setReviewDate(?\DateTimeInterface $review_date): self
+    public function initReviewDate(?\DateTimeInterface $review_date): self
     {
-        return $this->setReview_date($review_date);
+        return $this->initReview_date($review_date);
     }
 
     #[ORM\Column(type: 'integer', nullable: true)]

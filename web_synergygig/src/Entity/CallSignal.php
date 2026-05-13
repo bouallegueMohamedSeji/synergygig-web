@@ -3,19 +3,25 @@
 namespace App\Entity;
 
 use App\Repository\CallSignalRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CallSignalRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'call_signals')]
 class CallSignal
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Call::class, inversedBy: 'signals')]
-    #[ORM\JoinColumn(name: 'call_id', referencedColumnName: 'id', nullable: false)]
+    #[ORM\JoinColumn(name: 'call_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Call $call = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -27,9 +33,6 @@ class CallSignal
 
     #[ORM\Column(type: 'text')]
     private ?string $payload = null;
-
-    #[ORM\Column(type: 'datetime')]
-    private ?\DateTimeInterface $createdAt = null;
 
     public function getId(): ?int { return $this->id; }
 
@@ -44,7 +47,4 @@ class CallSignal
 
     public function getPayload(): ?string { return $this->payload; }
     public function setPayload(?string $payload): self { $this->payload = $payload; return $this; }
-
-    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
-    public function setCreatedAt(?\DateTimeInterface $createdAt): self { $this->createdAt = $createdAt; return $this; }
 }

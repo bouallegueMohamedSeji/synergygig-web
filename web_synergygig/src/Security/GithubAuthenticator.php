@@ -83,7 +83,7 @@ class GithubAuthenticator extends OAuth2Authenticator implements AuthenticationE
                 $user->setLastName($nameParts[1] ?? '');
                 $user->setGithubId($githubId);
                 $user->setRole('EMPLOYEE');
-                $user->setCreated_at(new \DateTime());
+                $user->setCreatedAt(new \DateTime());
                 $user->setPassword(bin2hex(random_bytes(32)));
                 // GitHub has already verified this account
                 $user->setIsVerified(true);

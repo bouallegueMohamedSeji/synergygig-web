@@ -33,7 +33,7 @@ class LastSeenListener
             return;
         }
 
-        $user->setLastSeenAt($now);
+        $user->initLastSeenAt($now);
         $user->setOnlineStatus('online');
         $this->em->flush();
     }

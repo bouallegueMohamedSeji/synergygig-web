@@ -44,7 +44,7 @@ class Message
     }
 
     #[ORM\ManyToOne(targetEntity: ChatRoom::class, inversedBy: 'messages')]
-    #[ORM\JoinColumn(name: 'room_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'room_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?ChatRoom $room = null;
 
     public function getRoom(): ?ChatRoom
@@ -80,7 +80,8 @@ class Message
         return $this->timestamp;
     }
 
-    public function setTimestamp(\DateTimeInterface $timestamp): self
+    /** @internal Timestamp — set once */
+    public function initTimestamp(\DateTimeInterface $timestamp): self
     {
         $this->timestamp = $timestamp;
         return $this;

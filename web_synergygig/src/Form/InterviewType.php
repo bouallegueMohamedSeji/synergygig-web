@@ -49,6 +49,11 @@ class InterviewType extends AbstractType
                 ],
                 'attr' => ['class' => 'form-control'],
                 'label_attr' => ['class' => 'form-label'],
+                'setter' => function (Interview &$interview, ?\DateTimeInterface $value): void {
+                    if ($value !== null) {
+                        $interview->initDate_time($value);
+                    }
+                },
             ])
             ->add('offer', EntityType::class, [
                 'class' => Offer::class,

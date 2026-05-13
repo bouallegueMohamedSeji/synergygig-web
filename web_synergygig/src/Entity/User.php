@@ -10,11 +10,18 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Ignore;
 
 use App\Repository\UserRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
+use App\Entity\Embeddable\Email;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-#[ORM\Table(name: 'user')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'app_user')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -29,6 +36,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->id = $id;
         return $this;
+    }
+
+    #[ORM\Embedded(class: Email::class, columnPrefix: 'email_address_')]
+    private ?Email $emailAddress = null;
+
+    public function getEmailAddress(): ?Email
+    {
+        return $this->emailAddress;
     }
 
     #[ORM\Column(type: 'string', nullable: false)]
@@ -123,32 +138,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->role = $role;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $avatar_path = null;
 
@@ -314,26 +303,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private ?float $monthly_salary = null;
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $monthly_salary = null;
 
-    public function getMonthly_salary(): ?float
+    public function getMonthly_salary(): ?string
     {
         return $this->monthly_salary;
     }
 
-    public function getMonthlySalary(): ?float
+    public function getMonthlySalary(): ?string
     {
         return $this->monthly_salary;
     }
 
-    public function setMonthly_salary(?float $monthly_salary): self
+    public function setMonthly_salary(?string $monthly_salary): self
     {
         $this->monthly_salary = $monthly_salary;
         return $this;
     }
 
-    public function setMonthlySalary(?float $monthly_salary): self
+    public function setMonthlySalary(?string $monthly_salary): self
     {
         $this->monthly_salary = $monthly_salary;
         return $this;
@@ -401,7 +390,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->reset_token_expires_at;
     }
 
-    public function setResetTokenExpiresAt(?\DateTimeInterface $reset_token_expires_at): self
+    /** @internal Timestamp — set once */
+    public function initResetTokenExpiresAt(?\DateTimeInterface $reset_token_expires_at): self
     {
         $this->reset_token_expires_at = $reset_token_expires_at;
         return $this;
@@ -411,7 +401,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeInterface $last_seen_at = null;
 
     public function getLastSeenAt(): ?\DateTimeInterface { return $this->last_seen_at; }
-    public function setLastSeenAt(?\DateTimeInterface $v): self { $this->last_seen_at = $v; return $this; }
+    /** @internal Timestamp */ public function initLastSeenAt(?\DateTimeInterface $v): self { $this->last_seen_at = $v; return $this; }
 
     #[ORM\Column(type: 'string', nullable: true)]
     private ?string $online_status = null; // online | away | offline
@@ -452,7 +442,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setCvOriginalName(?string $v): self { $this->cv_original_name = $v; return $this; }
 
     public function getCvUploadedAt(): ?\DateTimeInterface { return $this->cv_uploaded_at; }
-    public function setCvUploadedAt(?\DateTimeInterface $v): self { $this->cv_uploaded_at = $v; return $this; }
+    /** @internal Timestamp */ public function initCvUploadedAt(?\DateTimeInterface $v): self { $this->cv_uploaded_at = $v; return $this; }
 
     public function getCvSkillsText(): ?string { return $this->cv_skills_text; }
     public function setCvSkillsText(?string $v): self { $this->cv_skills_text = $v; return $this; }

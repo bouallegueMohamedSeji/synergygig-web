@@ -6,6 +6,8 @@ use App\Entity\Department;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/** @extends ServiceEntityRepository<Department> */
+
 class DepartmentRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,3 +17,5 @@ class DepartmentRepository extends ServiceEntityRepository
 
     // Add custom methods as needed
 }
+
+

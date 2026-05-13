@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Offer;
+use App\Entity\User;
 use App\Form\OfferType;
 use App\Repository\OfferRepository;
 use App\Repository\JobApplicationRepository;
@@ -38,7 +39,7 @@ class ProjectOwnerController extends AbstractController
         $q = $request->query->get('q');
         if ($q) {
             $qb->andWhere('LOWER(o.title) LIKE :q')
-               ->setParameter('q', '%' . mb_strtolower($q) . '%');
+               ->setParameter('q', '%' . mb_strtolower((string) $q) . '%');
         }
 
         $offers = $qb->getQuery()->getResult();
@@ -56,15 +57,18 @@ class ProjectOwnerController extends AbstractController
     #[Route('/offers/new', name: 'app_project_owner_offer_new')]
     public function newOffer(Request $request, EntityManagerInterface $em): Response
     {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
         $offer = new Offer();
-        $offer->setOwner($this->getUser());
+        $offer->setOwner($user);
         $offer->setStatus('DRAFT');
 
         $form = $this->createForm(OfferType::class, $offer);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $offer->setCreatedAt(new \DateTime());
             $em->persist($offer);
             $em->flush();
             $this->addFlash('success', 'Offer created as DRAFT. It will be reviewed by HR.');
@@ -125,7 +129,7 @@ class ProjectOwnerController extends AbstractController
             return $this->redirectToRoute('app_project_owner_offers');
         }
 
-        if ($this->isCsrfTokenValid('delete' . $offer->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $offer->getId(), (string) $request->request->get('_token'))) {
             $em->remove($offer);
             $em->flush();
             $this->addFlash('success', 'Offer deleted.');

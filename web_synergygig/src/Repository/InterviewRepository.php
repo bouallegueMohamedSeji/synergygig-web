@@ -6,6 +6,8 @@ use App\Entity\Interview;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/** @extends ServiceEntityRepository<Interview> */
+
 class InterviewRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,3 +17,5 @@ class InterviewRepository extends ServiceEntityRepository
 
     // Add custom methods as needed
 }
+
+

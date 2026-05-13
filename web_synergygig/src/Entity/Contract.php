@@ -7,11 +7,18 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\ContractRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
+use App\Entity\Embeddable\Money;
 
 #[ORM\Entity(repositoryClass: ContractRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'contracts')]
 class Contract
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -29,7 +36,7 @@ class Contract
     }
 
     #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'contracts')]
-    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Offer $offer = null;
 
     public function getOffer(): ?Offer
@@ -87,31 +94,45 @@ class Contract
         return $this;
     }
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private ?float $amount = null;
+    #[ORM\Embedded(class: Money::class, columnPrefix: 'money_')]
+    private Money $budget;
 
-    public function getAmount(): ?float
+    public function __construct()
     {
-        return $this->amount;
+        $this->budget = new Money();
     }
 
-    public function setAmount(?float $amount): self
+    public function getBudget(): Money
     {
-        $this->amount = $amount;
+        return $this->budget;
+    }
+
+    public function setBudget(Money $budget): self
+    {
+        $this->budget = $budget;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
-    private ?string $currency = null;
+    public function getAmount(): ?string
+    {
+        return $this->budget->getAmount() !== 0 ? (string) ($this->budget->getAmount() / 100) : null;
+    }
+
+    public function setAmount(?string $amount): self
+    {
+        $cents = $amount !== null ? (int) round((float) $amount * 100) : 0;
+        $this->budget = new Money($cents, $this->budget->getCurrency());
+        return $this;
+    }
 
     public function getCurrency(): ?string
     {
-        return $this->currency;
+        return $this->budget->getCurrency();
     }
 
     public function setCurrency(?string $currency): self
     {
-        $this->currency = $currency;
+        $this->budget = new Money($this->budget->getAmount(), $currency ?? 'USD');
         return $this;
     }
 
@@ -238,15 +259,16 @@ class Contract
         return $this->getSigned_at();
     }
 
-    public function setSigned_at(?\DateTimeInterface $signed_at): self
+    /** @internal Timestamp — set once */
+    public function initSigned_at(?\DateTimeInterface $signed_at): self
     {
         $this->signed_at = $signed_at;
         return $this;
     }
 
-    public function setSignedAt(?\DateTimeInterface $signed_at): self
+    public function initSignedAt(?\DateTimeInterface $signed_at): self
     {
-        return $this->setSigned_at($signed_at);
+        return $this->initSigned_at($signed_at);
     }
 
     #[ORM\Column(type: 'date', nullable: true)]
@@ -296,31 +318,6 @@ class Contract
     {
         return $this->setEnd_date($end_date);
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $signature_data = null;
 
@@ -369,26 +366,26 @@ class Contract
         return $this->setSigned_by_user_id($signed_by_user_id);
     }
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private ?float $counter_amount = null;
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $counter_amount = null;
 
-    public function getCounter_amount(): ?float
+    public function getCounter_amount(): ?string
     {
         return $this->counter_amount;
     }
 
-    public function getCounterAmount(): ?float
+    public function getCounterAmount(): ?string
     {
         return $this->getCounter_amount();
     }
 
-    public function setCounter_amount(?float $counter_amount): self
+    public function setCounter_amount(?string $counter_amount): self
     {
         $this->counter_amount = $counter_amount;
         return $this;
     }
 
-    public function setCounterAmount(?float $counter_amount): self
+    public function setCounterAmount(?string $counter_amount): self
     {
         return $this->setCounter_amount($counter_amount);
     }

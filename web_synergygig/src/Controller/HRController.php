@@ -45,7 +45,11 @@ class HRController extends AbstractController
         PayrollRepository $payrollRepo,
     ): Response {
         $totalEmployees = $userRepo->count(['role' => 'EMPLOYEE']);
-        $departments = $deptRepo->count([]);
+        $departments = $deptRepo->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult();
 
         $today = new \DateTime('today');
         $tomorrow = new \DateTime('tomorrow');
@@ -105,7 +109,11 @@ class HRController extends AbstractController
         $tomorrow = new \DateTime('tomorrow');
 
         // Stats
-        $totalEmployees = $userRepo->count([]);
+        $totalEmployees = $userRepo->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult();
         $pendingLeaves = $leaveRepo->count(['status' => 'PENDING']);
         $todayAttendanceList = $attendanceRepo->createQueryBuilder('a')
             ->where('a.date >= :today')

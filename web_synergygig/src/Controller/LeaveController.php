@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Leave;
+use App\Entity\User;
 use App\Form\LeaveType;
 use App\Repository\LeaveRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -59,8 +60,9 @@ class LeaveController extends AbstractController
         $isHr = $this->isGranted('ROLE_HR');
 
         // Non-HR users can only create leaves for themselves
-        if (!$isHr) {
-            $leave->setUser($this->getUser());
+        $currentUser = $this->getUser();
+        if (!$isHr && $currentUser instanceof User) {
+            $leave->setUser($currentUser);
             $leave->setStatus('PENDING');
         }
         $form = $this->createForm(LeaveType::class, $leave, ['is_hr' => $isHr]);
@@ -69,7 +71,10 @@ class LeaveController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             // Enforce: non-HR users can only create for themselves with PENDING
             if (!$isHr) {
-                $leave->setUser($this->getUser());
+                if (!$currentUser instanceof User) {
+                    throw $this->createAccessDeniedException('Invalid authenticated user.');
+                }
+                $leave->setUser($currentUser);
                 $leave->setStatus('PENDING');
             }
 
@@ -85,7 +90,6 @@ class LeaveController extends AbstractController
                 ]);
             }
 
-            $leave->setCreatedAt(new \DateTime());
             if (!$leave->getStatus()) {
                 $leave->setStatus('PENDING');
             }
@@ -93,7 +97,11 @@ class LeaveController extends AbstractController
             // Handle optional file attachment
             $file = $form->get('attachmentFile')->getData();
             if ($file) {
-                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/leaves';
+                $projectDir = $this->getParameter('kernel.project_dir');
+                if (!is_string($projectDir)) {
+                    throw new \RuntimeException('Invalid project directory configuration.');
+                }
+                $uploadDir = $projectDir . '/public/uploads/leaves';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0775, true);
                 }
@@ -121,7 +129,7 @@ class LeaveController extends AbstractController
         $balance = null;
         if ($leave->getUser() && $leave->getType()) {
             $year = $leave->getStartDate() ? (int) $leave->getStartDate()->format('Y') : (int) date('Y');
-            $used = $this->getUsedLeaveDays($repo, $leave->getUser()->getId(), $leave->getType(), $year);
+            $used = $this->getUsedLeaveDays($repo, (int) $leave->getUser()->getId(), $leave->getType(), $year);
             $max = $this->getMaxDays($leave->getType());
             $balance = [
                 'used' => $used,
@@ -157,8 +165,9 @@ class LeaveController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             // Enforce: non-HR cannot change user or status
-            if (!$isHr) {
-                $leave->setUser($this->getUser());
+            $currentUser = $this->getUser();
+            if (!$isHr && $currentUser instanceof User) {
+                $leave->setUser($currentUser);
                 $leave->setStatus('PENDING');
             }
 
@@ -177,7 +186,11 @@ class LeaveController extends AbstractController
             // Handle optional file attachment
             $file = $form->get('attachmentFile')->getData();
             if ($file) {
-                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/leaves';
+                $projectDir = $this->getParameter('kernel.project_dir');
+                if (!is_string($projectDir)) {
+                    throw new \RuntimeException('Invalid project directory configuration.');
+                }
+                $uploadDir = $projectDir . '/public/uploads/leaves';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0775, true);
                 }
@@ -202,7 +215,7 @@ class LeaveController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function approve(Request $request, Leave $leave, EntityManagerInterface $em, LeaveRepository $repo, N8nWebhookService $n8n, NotificationService $notifier): Response
     {
-        if (!$this->isCsrfTokenValid('approve' . $leave->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('approve' . $leave->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
         }
@@ -214,9 +227,9 @@ class LeaveController extends AbstractController
 
         // Check balance
         $requestedDays = $this->calculateDays($leave);
-        if ($leave->getUser() && $leave->getType()) {
+        if ($leave->getUser() && $leave->getType() && $leave->getStartDate()) {
             $year = (int) $leave->getStartDate()->format('Y');
-            $used = $this->getUsedLeaveDays($repo, $leave->getUser()->getId(), $leave->getType(), $year);
+            $used = $this->getUsedLeaveDays($repo, (int) $leave->getUser()->getId(), $leave->getType(), $year);
             $max = $this->getMaxDays($leave->getType());
 
             if (($used + $requestedDays) > $max) {
@@ -233,14 +246,15 @@ class LeaveController extends AbstractController
         $em->flush();
 
         $n8n->leaveStatusChanged(
-            $leave->getId(),
+            (int) $leave->getId(),
             $leave->getUser() ? $leave->getUser()->getFirstName() . ' ' . $leave->getUser()->getLastName() : 'N/A',
+            $leave->getType() ?? 'Leave',
             'APPROVED',
-            $leave->getType()
+            'HR'
         );
 
         if ($leave->getUser()) {
-            $notifier->leaveApproved($leave->getUser(), $leave->getId(), $leave->getType() ?? 'Leave');
+            $notifier->leaveApproved($leave->getUser(), (int) $leave->getId(), $leave->getType() ?? 'Leave');
         }
 
         $this->addFlash('success', 'Leave request approved.');
@@ -251,7 +265,7 @@ class LeaveController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function reject(Request $request, Leave $leave, EntityManagerInterface $em, N8nWebhookService $n8n, NotificationService $notifier): Response
     {
-        if (!$this->isCsrfTokenValid('reject' . $leave->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('reject' . $leave->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
         }
@@ -261,7 +275,7 @@ class LeaveController extends AbstractController
             return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
         }
 
-        $rejectionReason = trim($request->request->get('rejection_reason', ''));
+        $rejectionReason = trim((string) $request->request->get('rejection_reason', ''));
         if (strlen($rejectionReason) < 5) {
             $this->addFlash('error', 'Rejection reason must be at least 5 characters.');
             return $this->redirectToRoute('app_leave_show', ['id' => $leave->getId()]);
@@ -272,14 +286,15 @@ class LeaveController extends AbstractController
         $em->flush();
 
         $n8n->leaveStatusChanged(
-            $leave->getId(),
+            (int) $leave->getId(),
             $leave->getUser() ? $leave->getUser()->getFirstName() . ' ' . $leave->getUser()->getLastName() : 'N/A',
+            $leave->getType() ?? 'Leave',
             'REJECTED',
-            $leave->getType()
+            'HR'
         );
 
         if ($leave->getUser()) {
-            $notifier->leaveRejected($leave->getUser(), $leave->getId(), $leave->getType() ?? 'Leave', $rejectionReason);
+            $notifier->leaveRejected($leave->getUser(), (int) $leave->getId(), $leave->getType() ?? 'Leave', $rejectionReason);
         }
 
         $this->addFlash('success', 'Leave request rejected.');
@@ -290,7 +305,7 @@ class LeaveController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function delete(Request $request, Leave $leave, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $leave->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $leave->getId(), (string) $request->request->get('_token'))) {
             $em->remove($leave);
             $em->flush();
             $this->addFlash('success', 'Leave request deleted.');
@@ -299,6 +314,7 @@ class LeaveController extends AbstractController
         return $this->redirectToRoute('app_leave_index');
     }
 
+    /** @return string[] */
     private function validateLeave(Leave $leave): array
     {
         $errors = [];

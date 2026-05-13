@@ -131,7 +131,8 @@ class ApplicationMatchService
         // First, check the required_skills field directly
         $requiredSkills = $offer->getRequiredSkills();
         if ($requiredSkills) {
-            $list = array_map('trim', preg_split('/[,;|]+/', $requiredSkills));
+            $parts = preg_split('/[,;|]+/', $requiredSkills);
+            $list = array_map('trim', $parts === false ? [] : $parts);
             $list = array_filter($list, fn($s) => strlen($s) > 1);
             if (!empty($list)) {
                 return array_values($list);

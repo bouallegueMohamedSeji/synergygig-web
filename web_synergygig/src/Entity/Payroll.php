@@ -236,15 +236,16 @@ class Payroll
         return $this->getGenerated_at();
     }
 
-    public function setGenerated_at(\DateTimeInterface $generated_at): self
+    /** @internal Timestamp — set once */
+    public function initGenerated_at(\DateTimeInterface $generated_at): self
     {
         $this->generated_at = $generated_at;
         return $this;
     }
 
-    public function setGeneratedAt(\DateTimeInterface $generated_at): self
+    public function initGeneratedAt(\DateTimeInterface $generated_at): self
     {
-        return $this->setGenerated_at($generated_at);
+        return $this->initGenerated_at($generated_at);
     }
 
 }

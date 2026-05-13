@@ -39,6 +39,7 @@ class ProjectController extends AbstractController
                 ->orderBy('p.id', 'DESC');
         } else {
             $myTasks = $taskRepo->findBy(['assignedTo' => $user]);
+            /** @var \App\Entity\Task[] $myTasks */
             $projectIds = array_unique(array_filter(array_map(
                 fn($t) => $t->getProject()?->getId(), $myTasks
             )));
@@ -71,7 +72,6 @@ class ProjectController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $project->setCreatedAt(new \DateTime());
             $em->persist($project);
             $em->flush();
             $this->addFlash('success', 'Project created.');
@@ -88,6 +88,7 @@ class ProjectController extends AbstractController
     public function kanban(Project $project, TaskRepository $taskRepo): Response
     {
         $tasks = $taskRepo->findBy(['project' => $project]);
+        /** @var \App\Entity\Task[] $tasks */
         $columns = [
             'TODO' => [],
             'IN_PROGRESS' => [],
@@ -233,7 +234,7 @@ class ProjectController extends AbstractController
         if (!$this->isGranted('ROLE_ADMIN') && $project->getOwner() !== $this->getUser()) {
             throw $this->createAccessDeniedException('You can only delete your own projects.');
         }
-        if ($this->isCsrfTokenValid('delete' . $project->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $project->getId(), (string) $request->request->get('_token'))) {
             $em->remove($project);
             $em->flush();
             $this->addFlash('success', 'Project deleted.');
@@ -302,12 +303,14 @@ class ProjectController extends AbstractController
         }
 
         // Count team size (distinct assignees on this project + 1)
+        /** @var \App\Entity\Task[] $tasksForTeam */
+        $tasksForTeam = $taskRepo->findBy(['project' => $project]);
         $teamSize = max(1, count(array_unique(array_filter(
-            array_map(fn($t) => $t->getAssignedTo()?->getId(), $taskRepo->findBy(['project' => $project]))
+            array_map(fn($t) => $t->getAssignedTo()?->getId(), $tasksForTeam)
         ))));
 
         $generated = $aiService->generateProjectTasks(
-            $project->getName(),
+            (string) $project->getName(),
             $project->getDescription() ?? '',
             $teamSize
         );
@@ -333,7 +336,6 @@ class ProjectController extends AbstractController
             $task->setDescription(is_string($taskData['description'] ?? null) ? $taskData['description'] : '');
             $task->setStatus('TODO');
             $task->setPriority($priority);
-            $task->setCreatedAt(new \DateTime());
             $em->persist($task);
 
             $created[] = [
@@ -382,6 +384,7 @@ class ProjectController extends AbstractController
         $sprintDays = max(1, min(90, (int) ($payload['sprint_days'] ?? 10)));
 
         $tasks = $taskRepo->findBy(['project' => $project]);
+        /** @var \App\Entity\Task[] $tasks */
         if (empty($tasks)) {
             return $this->json(['error' => 'No tasks found. Add tasks before planning a sprint.'], 400);
         }
@@ -398,7 +401,8 @@ class ProjectController extends AbstractController
             array_map(fn($t) => $t->getAssignedTo()?->getId(), $tasks)
         ))));
 
-        $result = $aiService->planSprint(json_encode($taskArr), $teamSize, $sprintDays);
+        $tasksEncoded = json_encode($taskArr);
+        $result = $aiService->planSprint($tasksEncoded !== false ? $tasksEncoded : '[]', $teamSize, $sprintDays);
         if (!$result) {
             return $this->json(['error' => 'Sprint planning failed. Please try again.'], 502);
         }
@@ -450,6 +454,7 @@ class ProjectController extends AbstractController
 
         // "prepare" mode: build context from project tasks
         $tasks = $taskRepo->findBy(['project' => $project]);
+        /** @var \App\Entity\Task[] $tasks */
         $tasksText = implode("\n", array_map(
             fn($t) => sprintf('- [%s] %s (%s)', $t->getStatus() ?? 'TODO', $t->getTitle(), $t->getPriority() ?? 'MEDIUM'),
             $tasks
@@ -458,7 +463,7 @@ class ProjectController extends AbstractController
             $tasksText = '- No tasks yet.';
         }
 
-        $agenda = $aiService->prepMeeting($project->getName(), $tasksText, 'Team (see project members)');
+        $agenda = $aiService->prepMeeting((string) $project->getName(), $tasksText, 'Team (see project members)');
         return $this->json(['result' => $agenda]);
     }
 
@@ -617,7 +622,7 @@ class ProjectController extends AbstractController
         if ($task->getPriority()) {
             $labels[] = 'priority:' . strtolower($task->getPriority());
         }
-        $result = $gitHub->createIssue($repo, $task->getTitle(), $body, $labels);
+        $result = $gitHub->createIssue($repo, (string) $task->getTitle(), $body, $labels);
         if (!$result) {
             return $this->json(['error' => 'Failed to create GitHub issue. Check GITHUB_TOKEN.'], 500);
         }

@@ -6,6 +6,8 @@ use App\Entity\CallSignal;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/** @extends ServiceEntityRepository<CallSignal> */
+
 class CallSignalRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -43,3 +45,6 @@ class CallSignalRepository extends ServiceEntityRepository
             ->execute();
     }
 }
+
+
+

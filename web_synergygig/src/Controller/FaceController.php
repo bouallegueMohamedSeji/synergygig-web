@@ -29,7 +29,7 @@ class FaceController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $imageData = $request->request->get('face_image', '');
+        $imageData = (string) $request->request->get('face_image', '');
         $decoded = null;
 
         if (!empty($imageData)) {
@@ -72,23 +72,28 @@ class FaceController extends AbstractController
 
         try {
             // Run Python encoding script
-            $pythonScript = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
+            $projectDir = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDir)) {
+                throw new \RuntimeException('Invalid project directory configuration.');
+            }
+            $pythonScript = $projectDir . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
             $cmd = sprintf('python3 "%s" "%s" 2>&1', str_replace('/', DIRECTORY_SEPARATOR, $pythonScript), $tmpFile);
             $output = shell_exec($cmd);
+            $outputText = (string) $output;
 
-            if ($output === null || trim($output) === '') {
+            if ($output === null || trim($outputText) === '') {
                 $this->addFlash('danger', 'Face recognition service unavailable. Make sure Python and required packages (mediapipe, opencv-python) are installed.');
                 return $this->redirectToRoute('app_face_enroll');
             }
 
             // Find JSON in output (skip any warnings/logs before it)
-            $jsonStart = strpos($output, '{');
+            $jsonStart = strpos($outputText, '{');
             if ($jsonStart === false) {
-                $this->addFlash('danger', 'Face recognition returned unexpected output: ' . substr($output, 0, 200));
+                $this->addFlash('danger', 'Face recognition returned unexpected output: ' . substr($outputText, 0, 200));
                 return $this->redirectToRoute('app_face_enroll');
             }
 
-            $result = json_decode(substr($output, $jsonStart), true);
+            $result = json_decode(substr($outputText, $jsonStart), true);
             if (!$result || !isset($result['success'])) {
                 $this->addFlash('danger', 'Invalid response from face recognition service.');
                 return $this->redirectToRoute('app_face_enroll');
@@ -125,7 +130,7 @@ class FaceController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        if ($this->isCsrfTokenValid('face_remove', $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('face_remove', (string) $request->request->get('_token'))) {
             $user->setFaceEncoding(null);
             $em->flush();
             $this->addFlash('success', 'Face ID removed.');

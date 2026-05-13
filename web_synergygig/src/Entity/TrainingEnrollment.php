@@ -9,7 +9,7 @@ use Doctrine\Common\Collections\Collection;
 use App\Repository\TrainingEnrollmentRepository;
 
 #[ORM\Entity(repositoryClass: TrainingEnrollmentRepository::class)]
-#[ORM\Table(name: 'training_enrollments')]
+#[ORM\Table(name: 'training_enrollment')]
 class TrainingEnrollment
 {
     #[ORM\Id]
@@ -17,7 +17,8 @@ class TrainingEnrollment
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'enrollment', targetEntity: TrainingCertificate::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, TrainingCertificate> */
+    #[ORM\OneToMany(mappedBy: 'enrollment', targetEntity: TrainingCertificate::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $certificates;
 
     public function __construct()
@@ -36,10 +37,11 @@ class TrainingEnrollment
         return $this;
     }
 
+    /** @return Collection<int, TrainingCertificate> */
     public function getCertificates(): Collection { return $this->certificates; }
 
     #[ORM\ManyToOne(targetEntity: TrainingCourse::class, inversedBy: 'enrollments')]
-    #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?TrainingCourse $course = null;
 
     public function getCourse(): ?TrainingCourse
@@ -123,15 +125,16 @@ class TrainingEnrollment
         return $this->getEnrolled_at();
     }
 
-    public function setEnrolled_at(\DateTimeInterface $enrolled_at): self
+    /** @internal Timestamp — set once */
+    public function initEnrolled_at(\DateTimeInterface $enrolled_at): self
     {
         $this->enrolled_at = $enrolled_at;
         return $this;
     }
 
-    public function setEnrolledAt(\DateTimeInterface $enrolled_at): self
+    public function initEnrolledAt(\DateTimeInterface $enrolled_at): self
     {
-        return $this->setEnrolled_at($enrolled_at);
+        return $this->initEnrolled_at($enrolled_at);
     }
 
     #[ORM\Column(type: 'datetime', nullable: true)]
@@ -147,15 +150,16 @@ class TrainingEnrollment
         return $this->getCompleted_at();
     }
 
-    public function setCompleted_at(?\DateTimeInterface $completed_at): self
+    /** @internal Timestamp — set once */
+    public function initCompleted_at(?\DateTimeInterface $completed_at): self
     {
         $this->completed_at = $completed_at;
         return $this;
     }
 
-    public function setCompletedAt(?\DateTimeInterface $completed_at): self
+    public function initCompletedAt(?\DateTimeInterface $completed_at): self
     {
-        return $this->setCompleted_at($completed_at);
+        return $this->initCompleted_at($completed_at);
     }
 
 }

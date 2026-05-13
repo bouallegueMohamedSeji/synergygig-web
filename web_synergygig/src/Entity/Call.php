@@ -7,17 +7,24 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\CallRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: CallRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'calls')]
 class Call
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'call', targetEntity: CallSignal::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, CallSignal> */
+    #[ORM\OneToMany(mappedBy: 'call', targetEntity: CallSignal::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $signals;
 
     public function __construct()
@@ -36,6 +43,7 @@ class Call
         return $this;
     }
 
+    /** @return Collection<int, CallSignal> */
     public function getSignals(): Collection { return $this->signals; }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -143,15 +151,16 @@ class Call
         return $this->getStarted_at();
     }
 
-    public function setStarted_at(?\DateTimeInterface $started_at): self
+    /** @internal Timestamp — set once */
+    public function initStarted_at(?\DateTimeInterface $started_at): self
     {
         $this->started_at = $started_at;
         return $this;
     }
 
-    public function setStartedAt(?\DateTimeInterface $started_at): self
+    public function initStartedAt(?\DateTimeInterface $started_at): self
     {
-        return $this->setStarted_at($started_at);
+        return $this->initStarted_at($started_at);
     }
 
     #[ORM\Column(type: 'datetime', nullable: true)]
@@ -167,39 +176,15 @@ class Call
         return $this->getEnded_at();
     }
 
-    public function setEnded_at(?\DateTimeInterface $ended_at): self
+    /** @internal Timestamp — set once */
+    public function initEnded_at(?\DateTimeInterface $ended_at): self
     {
         $this->ended_at = $ended_at;
         return $this;
     }
 
-    public function setEndedAt(?\DateTimeInterface $ended_at): self
+    public function initEndedAt(?\DateTimeInterface $ended_at): self
     {
-        return $this->setEnded_at($ended_at);
+        return $this->initEnded_at($ended_at);
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

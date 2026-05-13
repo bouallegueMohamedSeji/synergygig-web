@@ -6,7 +6,9 @@ use App\Entity\ChatRoom;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class ChatRoomRepository extends ServiceEntityRepository {
+/** @extends ServiceEntityRepository<ChatRoom> */
+class ChatRoomRepository extends ServiceEntityRepository
+{
     public function __construct(ManagerRegistry $registry) {
         parent::__construct($registry, ChatRoom::class);
     }
@@ -27,3 +29,6 @@ class ChatRoomRepository extends ServiceEntityRepository {
         return $this->findBy(['type' => $type, 'isArchived' => false]);
     }
 }
+
+
+

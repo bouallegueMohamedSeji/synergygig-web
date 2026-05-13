@@ -121,7 +121,7 @@ class BadWordsService
                 $count++;
                 // Censor in original text (case-insensitive)
                 $stars = str_repeat('*', mb_strlen($word));
-                $censored = preg_replace('/\b' . preg_quote($word, '/') . '\b/iu', $stars, $censored);
+                $censored = preg_replace('/\b' . preg_quote($word, '/') . '\b/iu', $stars, $censored) ?? $censored;
             }
         }
 
@@ -135,7 +135,7 @@ class BadWordsService
                     $count++;
                 }
                 $stars = str_repeat('*', mb_strlen($phrase));
-                $censored = preg_replace('/' . preg_quote($phrase, '/') . '/iu', $stars, $censored);
+                $censored = preg_replace('/' . preg_quote($phrase, '/') . '/iu', $stars, $censored) ?? $censored;
             }
         }
 

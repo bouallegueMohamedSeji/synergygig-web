@@ -58,7 +58,11 @@ class DashboardController extends AbstractController
         MessageRepository $messageRepo,
         EntityManagerInterface $em,
     ): Response {
-        $totalUsers = $userRepo->count([]);
+        $totalUsers = $userRepo->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult();
 
         $quote = self::QUOTES[array_rand(self::QUOTES)];
 
@@ -68,6 +72,7 @@ class DashboardController extends AbstractController
         $taskRows = $taskRepo->createQueryBuilder('t')
             ->select('NEW App\\DTO\\StatusCountDto(t.status, COUNT(t.id))')
             ->groupBy('t.status')
+            ->setMaxResults(20)
             ->getQuery()
             ->getResult();
         foreach ($taskRows as $row) {
@@ -82,6 +87,7 @@ class DashboardController extends AbstractController
         $leaveRows = $leaveRepo->createQueryBuilder('l')
             ->select('NEW App\\DTO\\StatusCountDto(l.status, COUNT(l.id))')
             ->groupBy('l.status')
+            ->setMaxResults(20)
             ->getQuery()
             ->getResult();
         foreach ($leaveRows as $row) {
@@ -96,6 +102,7 @@ class DashboardController extends AbstractController
         $roleRows = $userRepo->createQueryBuilder('u')
             ->select('NEW App\\DTO\\StatusCountDto(u.role, COUNT(u.id))')
             ->groupBy('u.role')
+            ->setMaxResults(20)
             ->getQuery()
             ->getResult();
         foreach ($roleRows as $row) {
@@ -112,6 +119,7 @@ class DashboardController extends AbstractController
         $offerRows = $offerRepo->createQueryBuilder('o')
             ->select('NEW App\\DTO\\StatusCountDto(o.status, COUNT(o.id))')
             ->groupBy('o.status')
+            ->setMaxResults(20)
             ->getQuery()
             ->getResult();
         foreach ($offerRows as $row) {
@@ -126,6 +134,7 @@ class DashboardController extends AbstractController
         $appRows = $appRepo->createQueryBuilder('a')
             ->select('NEW App\\DTO\\StatusCountDto(a.status, COUNT(a.id))')
             ->groupBy('a.status')
+            ->setMaxResults(20)
             ->getQuery()
             ->getResult();
         foreach ($appRows as $row) {
@@ -144,10 +153,11 @@ class DashboardController extends AbstractController
         // Chart data: department headcount (DTO hydration avoids array hydration and N+1 loops)
         $deptChart = [];
         $deptRows = $userRepo->createQueryBuilder('u')
-            ->select('NEW App\\DTO\\DepartmentHeadcountDto(d.name, COUNT(u.id))')
-            ->join('u.department', 'd')
+            ->select('NEW App\\DTO\\DepartmentHeadcountDto(d.name, COUNT(DISTINCT u.id))')
+            ->innerJoin('u.department', 'd')
             ->groupBy('d.id, d.name')
             ->orderBy('d.name', 'ASC')
+            ->setMaxResults(50)
             ->getQuery()
             ->getResult();
 
@@ -163,19 +173,43 @@ class DashboardController extends AbstractController
                 'employees' => $employees,
                 'gig_workers' => $gig,
                 'interviews' => (int) $interviewPending,
-                'departments' => $deptRepo->count([]),
-                'projects' => $projectRepo->count([]),
+                'departments' => $deptRepo->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
+                'projects' => $projectRepo->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
                 'offers' => array_sum($offerChart),
                 'offers_open' => $offerChart['OPEN'],
                 'offers_draft' => $offerChart['DRAFT'],
-                'contracts' => $contractRepo->count([]),
+                'contracts' => $contractRepo->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
                 'applications' => array_sum($appChart),
                 'apps_pending' => $appChart['PENDING'],
                 'apps_accepted' => $appChart['ACCEPTED'],
                 'tasks' => array_sum($taskChart),
-                'training' => $trainingRepo->count([]),
-                'chat_rooms' => $chatRoomRepo->count([]),
-                'messages' => $messageRepo->count([]),
+                'training' => $trainingRepo->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
+                'chat_rooms' => $chatRoomRepo->createQueryBuilder('cr')
+            ->select('COUNT(cr.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
+                'messages' => $messageRepo->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->where('1 = 1')
+            ->getQuery()
+            ->getSingleScalarResult(),
                 'pending_leaves' => $leaveChart['PENDING'],
                 'pending_payroll' => $payrollRepo->count(['status' => 'PENDING']),
             ],

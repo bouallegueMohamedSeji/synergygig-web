@@ -13,6 +13,9 @@ class ResetPasswordRequest implements ResetPasswordRequestInterface
 {
     use ResetPasswordRequestTrait;
 
+    #[Ignore]
+    protected $hashedToken;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -26,7 +29,7 @@ class ResetPasswordRequest implements ResetPasswordRequestInterface
         User $user,
         \DateTimeInterface $expiresAt,
         string $selector,
-        string $hashedToken
+        #[\SensitiveParameter] string $hashedToken
     ) {
         $this->user = $user;
         $this->initialize($expiresAt, $selector, $hashedToken);

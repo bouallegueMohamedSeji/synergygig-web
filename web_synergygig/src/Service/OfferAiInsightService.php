@@ -22,8 +22,8 @@ class OfferAiInsightService
         }
 
         // Strip markdown fences if present
-        $result = preg_replace('/^```(?:json)?\s*/i', '', trim($result));
-        $result = preg_replace('/\s*```$/', '', $result);
+        $result = preg_replace('/^```(?:json)?\s*/i', '', trim($result)) ?? trim($result);
+        $result = preg_replace('/\s*```$/', '', $result) ?? $result;
 
         $decoded = json_decode($result, true);
 

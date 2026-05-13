@@ -90,7 +90,7 @@ class PayrollController extends AbstractController
                 ]);
             }
 
-            $payroll->setGeneratedAt(new \DateTime());
+            $payroll->initGeneratedAt(new \DateTime());
             $em->persist($payroll);
             $em->flush();
             $this->addFlash('success', 'Payroll record created.');
@@ -117,7 +117,7 @@ class PayrollController extends AbstractController
         $users = $userRepo->findBy(['is_active' => true]);
 
         if ($request->isMethod('POST')) {
-            if (!$this->isCsrfTokenValid('payroll_generate', $request->request->get('_token'))) {
+            if (!$this->isCsrfTokenValid('payroll_generate', (string) $request->request->get('_token'))) {
                 $this->addFlash('error', 'Invalid CSRF token.');
                 return $this->redirectToRoute('app_payroll_generate');
             }
@@ -164,8 +164,8 @@ class PayrollController extends AbstractController
 
             // Calculate hours from attendance
             $totalHours = $this->calculateMonthlyHours($attendanceRepo, $user, $month, $year);
-            $hourlyRate = $user->getHourlyRate() ?? 0;
-            $monthlySalary = $user->getMonthlySalary() ?? 0;
+            $hourlyRate = (float) ($user->getHourlyRate() ?? 0);
+            $monthlySalary = (float) ($user->getMonthlySalary() ?? 0);
 
             // Base salary: use monthly salary if set, otherwise hourlyRate * hours
             if ($monthlySalary > 0) {
@@ -188,7 +188,7 @@ class PayrollController extends AbstractController
             $payroll->setTotalHoursWorked(round($totalHours, 2));
             $payroll->setHourlyRate($hourlyRate);
             $payroll->setStatus('PENDING');
-            $payroll->setGeneratedAt(new \DateTime());
+            $payroll->initGeneratedAt(new \DateTime());
 
             $em->persist($payroll);
             $em->flush();
@@ -199,7 +199,7 @@ class PayrollController extends AbstractController
                 // n8n webhook failure should not block payroll generation
             }
 
-            $notifier->payrollGenerated($user, $payroll->getId(), $month . '/' . $year, $netSalary);
+            $notifier->payrollGenerated($user, (int) $payroll->getId(), $month . '/' . $year, (float) $netSalary);
 
             $this->addFlash('success', sprintf(
                 'Payroll generated for %s %s — Net: %.2f',
@@ -226,7 +226,7 @@ class PayrollController extends AbstractController
         N8nWebhookService $n8n,
         NotificationService $notifier
     ): Response {
-        if (!$this->isCsrfTokenValid('payroll_generate_all', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('payroll_generate_all', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_payroll_generate');
         }
@@ -253,8 +253,8 @@ class PayrollController extends AbstractController
             }
 
             $totalHours = $this->calculateMonthlyHours($attendanceRepo, $user, $month, $year);
-            $hourlyRate = $user->getHourlyRate() ?? 0;
-            $monthlySalary = $user->getMonthlySalary() ?? 0;
+            $hourlyRate = (float) ($user->getHourlyRate() ?? 0);
+            $monthlySalary = (float) ($user->getMonthlySalary() ?? 0);
 
             if ($monthlySalary > 0) {
                 $baseSalary = $monthlySalary;
@@ -282,13 +282,13 @@ class PayrollController extends AbstractController
             $payroll->setTotalHoursWorked(round($totalHours, 2));
             $payroll->setHourlyRate($hourlyRate);
             $payroll->setStatus('PENDING');
-            $payroll->setGeneratedAt(new \DateTime());
+            $payroll->initGeneratedAt(new \DateTime());
 
             $em->persist($payroll);
             $generated++;
             $totalNet += $netSalary;
 
-            $notifier->payrollGenerated($user, 0, $month . '/' . $year, $netSalary);
+            $notifier->payrollGenerated($user, 0, $month . '/' . $year, (float) $netSalary);
         }
 
         $em->flush();
@@ -361,7 +361,7 @@ class PayrollController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function markPaid(Request $request, Payroll $payroll, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('pay' . $payroll->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('pay' . $payroll->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_payroll_show', ['id' => $payroll->getId()]);
         }
@@ -381,7 +381,7 @@ class PayrollController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function delete(Request $request, Payroll $payroll, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $payroll->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $payroll->getId(), (string) $request->request->get('_token'))) {
             $em->remove($payroll);
             $em->flush();
             $this->addFlash('success', 'Payroll record deleted.');
@@ -389,6 +389,9 @@ class PayrollController extends AbstractController
         return $this->redirectToRoute('app_payroll_index');
     }
 
+    /**
+     * @return list<string>
+     */
     private function validatePayroll(Payroll $payroll): array
     {
         $errors = [];

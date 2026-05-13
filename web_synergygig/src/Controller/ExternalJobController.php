@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Service\ExternalJobService;
 use App\Service\ExchangeRateService;
 use App\Service\HunterService;
@@ -39,9 +40,10 @@ class ExternalJobController extends AbstractController
         $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
 
         $data     = json_decode($request->getContent(), true);
-        $query    = trim($data['query'] ?? '');
-        $source   = $data['source'] ?? 'all';
-        $category = $data['category'] ?? '';
+        $data     = is_array($data) ? $data : [];
+        $query    = trim((string) ($data['query'] ?? ''));
+        $source   = (string) ($data['source'] ?? 'all');
+        $category = (string) ($data['category'] ?? '');
 
         if (strlen($query) < 2) {
             return $this->json(['error' => 'Please enter at least 2 characters.'], 422);
@@ -61,13 +63,17 @@ class ExternalJobController extends AbstractController
         $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
 
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['hasCV' => false, 'scores' => []]);
+        }
         $cvText = $user->getCvSkillsText() ?? ($user->getBio() ?? '');
 
-        if (!$cvText) {
+        if ($cvText === '') {
             return $this->json(['hasCV' => false, 'scores' => []]);
         }
 
         $data = json_decode($request->getContent(), true);
+        $data = is_array($data) ? $data : [];
         $jobs = $data['jobs'] ?? [];
 
         $scores = [];
@@ -99,9 +105,10 @@ class ExternalJobController extends AbstractController
     public function convert(Request $request): JsonResponse
     {
         $data   = json_decode($request->getContent(), true);
+        $data   = is_array($data) ? $data : [];
         $amount = (float) ($data['amount'] ?? 0);
-        $from   = strtoupper(trim($data['from'] ?? 'USD'));
-        $to     = strtoupper(trim($data['to'] ?? 'TND'));
+        $from   = strtoupper(trim((string) ($data['from'] ?? 'USD')));
+        $to     = strtoupper(trim((string) ($data['to'] ?? 'TND')));
 
         if ($amount <= 0) {
             return $this->json(['error' => 'Amount must be positive.'], 422);
@@ -133,7 +140,8 @@ class ExternalJobController extends AbstractController
         $this->denyAccessUnlessGranted('ROLE_GIG_WORKER');
 
         $data  = json_decode($request->getContent(), true);
-        $email = trim($data['email'] ?? '');
+        $data  = is_array($data) ? $data : [];
+        $email = trim((string) ($data['email'] ?? ''));
 
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->json(['error' => 'Please provide a valid email address.'], 422);

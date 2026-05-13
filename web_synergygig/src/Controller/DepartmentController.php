@@ -23,8 +23,8 @@ class DepartmentController extends AbstractController
     {
         $qb = $repo->createQueryBuilder('d')->orderBy('d.id', 'DESC');
 
-        $q = $request->query->get('q');
-        if ($q) {
+        $q = trim((string) $request->query->get('q', ''));
+        if ($q !== '') {
             $qb->andWhere('LOWER(d.name) LIKE :q')->setParameter('q', '%' . mb_strtolower($q) . '%');
         }
 
@@ -40,8 +40,6 @@ class DepartmentController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $department = new Department();
-        $department->setCreated_at(new \DateTime());
-
         $form = $this->createForm(DepartmentType::class, $department);
         $form->handleRequest($request);
 
@@ -129,7 +127,7 @@ class DepartmentController extends AbstractController
     #[Route('/{id}/delete', name: 'app_department_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, Department $department, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-' . $department->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-' . $department->getId(), (string) $request->request->get('_token'))) {
             $em->remove($department);
             $em->flush();
             $this->addFlash('success', 'Department deleted.');
@@ -141,7 +139,7 @@ class DepartmentController extends AbstractController
     #[Route('/{id}/assign/{userId}', name: 'app_department_assign_employee', methods: ['POST'], requirements: ['id' => '\d+', 'userId' => '\d+'])]
     public function assignEmployee(Department $department, int $userId, UserRepository $userRepo, EntityManagerInterface $em, Request $request): Response
     {
-        if (!$this->isCsrfTokenValid('assign-' . $department->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('assign-' . $department->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_department_show', ['id' => $department->getId()]);
         }
@@ -159,7 +157,7 @@ class DepartmentController extends AbstractController
     #[Route('/{id}/remove/{userId}', name: 'app_department_remove_employee', methods: ['POST'], requirements: ['id' => '\d+', 'userId' => '\d+'])]
     public function removeEmployee(Department $department, int $userId, UserRepository $userRepo, EntityManagerInterface $em, Request $request): Response
     {
-        if (!$this->isCsrfTokenValid('remove-' . $department->getId() . '-' . $userId, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('remove-' . $department->getId() . '-' . $userId, (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_department_show', ['id' => $department->getId()]);
         }
@@ -177,7 +175,7 @@ class DepartmentController extends AbstractController
     #[Route('/{id}/move/{userId}', name: 'app_department_move_employee', methods: ['POST'], requirements: ['id' => '\d+', 'userId' => '\d+'])]
     public function moveEmployee(int $id, int $userId, UserRepository $userRepo, DepartmentRepository $deptRepo, EntityManagerInterface $em, Request $request): Response
     {
-        if (!$this->isCsrfTokenValid('move-' . $userId, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('move-' . $userId, (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_department_show', ['id' => $id]);
         }
@@ -195,6 +193,7 @@ class DepartmentController extends AbstractController
         return $this->redirectToRoute('app_department_show', ['id' => $id]);
     }
 
+    /** @return string[] */
     private function validateDepartment(Department $department): array
     {
         $errors = [];

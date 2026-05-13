@@ -29,7 +29,7 @@ class GroupMember
     }
 
     #[ORM\ManyToOne(targetEntity: CommunityGroup::class, inversedBy: 'groupMembers')]
-    #[ORM\JoinColumn(name: 'group_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'group_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?CommunityGroup $group = null;
 
     public function getGroup(): ?CommunityGroup
@@ -85,15 +85,16 @@ class GroupMember
         return $this->getJoined_at();
     }
 
-    public function setJoined_at(\DateTimeInterface $joined_at): self
+    /** @internal Timestamp — set once at creation */
+    public function initJoined_at(\DateTimeInterface $joined_at): self
     {
         $this->joined_at = $joined_at;
         return $this;
     }
 
-    public function setJoinedAt(\DateTimeInterface $joined_at): self
+    public function initJoinedAt(\DateTimeInterface $joined_at): self
     {
-        return $this->setJoined_at($joined_at);
+        return $this->initJoined_at($joined_at);
     }
 
 }

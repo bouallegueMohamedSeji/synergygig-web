@@ -8,11 +8,11 @@ class UserManager
 {
     public function validate(User $user): bool
     {
-        if (empty($user->getFirstName())) {
+        if (empty(trim($user->getFirstName() ?? ''))) {
             throw new \InvalidArgumentException('Le prénom est obligatoire');
         }
 
-        if (empty($user->getLastName())) {
+        if (empty(trim($user->getLastName() ?? ''))) {
             throw new \InvalidArgumentException('Le nom est obligatoire');
         }
 

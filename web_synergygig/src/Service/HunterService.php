@@ -47,7 +47,7 @@ class HunterService
             return null;
         }
 
-        $data = json_decode($response, true);
+        $data = json_decode((string) $response, true);
         if (!isset($data['data'])) {
             return null;
         }

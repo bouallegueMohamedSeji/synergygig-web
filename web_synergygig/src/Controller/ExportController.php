@@ -25,6 +25,9 @@ class ExportController extends AbstractController
 
         $response = new StreamedResponse(function () use ($records) {
             $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                throw new \RuntimeException('Unable to open output stream.');
+            }
             fputcsv($handle, ['ID', 'Employee', 'Month', 'Year', 'Base Salary', 'Bonus', 'Deductions', 'Net Salary', 'Hours', 'Status', 'Generated']);
 
             foreach ($records as $p) {
@@ -60,6 +63,9 @@ class ExportController extends AbstractController
 
         $response = new StreamedResponse(function () use ($records) {
             $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                throw new \RuntimeException('Unable to open output stream.');
+            }
             fputcsv($handle, ['ID', 'Employee', 'Date', 'Check-In', 'Check-Out', 'Status', 'Hours']);
 
             foreach ($records as $a) {
@@ -97,6 +103,9 @@ class ExportController extends AbstractController
 
         $response = new StreamedResponse(function () use ($records) {
             $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                throw new \RuntimeException('Unable to open output stream.');
+            }
             fputcsv($handle, ['ID', 'Employee', 'Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Rejection Reason']);
 
             foreach ($records as $l) {

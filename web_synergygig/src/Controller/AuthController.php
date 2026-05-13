@@ -227,7 +227,6 @@ class AuthController extends AbstractController
             $user->setFirstName($data['first_name']);
             $user->setLastName($data['last_name']);
             $user->setRole($data['role']);
-            $user->setCreatedAt(new \DateTime());
             $user->setIsActive(true);
             $user->setIsVerified(false);
             $user->setIsOnline(false);
@@ -236,7 +235,7 @@ class AuthController extends AbstractController
             // Generate email verification token
             $token = bin2hex(random_bytes(32));
             $user->setResetToken($token);
-            $user->setResetTokenExpiresAt(new \DateTime('+24 hours'));
+            $user->initResetTokenExpiresAt(new \DateTime('+24 hours'));
 
             $em->persist($user);
             $em->flush();
@@ -286,7 +285,7 @@ class AuthController extends AbstractController
 
         $user->setIsVerified(true);
         $user->setResetToken(null);
-        $user->setResetTokenExpiresAt(null);
+        $user->initResetTokenExpiresAt(null);
         $em->flush();
 
         $this->addFlash('success', 'Email verified! You can now sign in.');
@@ -311,7 +310,7 @@ class AuthController extends AbstractController
 
         $token = bin2hex(random_bytes(32));
         $user->setResetToken($token);
-        $user->setResetTokenExpiresAt(new \DateTime('+24 hours'));
+        $user->initResetTokenExpiresAt(new \DateTime('+24 hours'));
         $em->flush();
 
         $this->sendVerificationEmail($user, $token, $request);
@@ -329,7 +328,7 @@ class AuthController extends AbstractController
             '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#e2e8f0;border-radius:12px">' .
             '<h2 style="text-align:center;color:#8b5cf6;margin:0 0 8px">SynergyGig</h2>' .
             '<p style="text-align:center;color:#94a3b8;font-size:14px;margin:0 0 24px">Email Verification</p>' .
-            '<p style="color:#e2e8f0;font-size:15px">Hi <strong style="color:#3b82f6">' . htmlspecialchars($user->getFirstName()) . '</strong>,</p>' .
+            '<p style="color:#e2e8f0;font-size:15px">Hi <strong style="color:#3b82f6">' . htmlspecialchars((string) $user->getFirstName()) . '</strong>,</p>' .
             '<p style="color:#94a3b8;font-size:14px">Welcome to SynergyGig! Please verify your email to activate your account.</p>' .
             '<div style="text-align:center;margin:24px 0">' .
             '<a href="' . htmlspecialchars($verifyUrl) . '" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;font-weight:700;font-size:15px;text-decoration:none;border-radius:8px">Verify My Email →</a>' .
@@ -342,7 +341,7 @@ class AuthController extends AbstractController
 
         $textBody = "Hi {$user->getFirstName()},\n\nWelcome to SynergyGig! Please verify your email to activate your account.\n\nVerify here: {$verifyUrl}\n\nIf you didn't create an account, you can safely ignore this email.\n\n© 2026 SynergyGig";
 
-        $this->sendEmailViaMailjet($user->getEmail(), 'SynergyGig — Verify Your Email', $htmlBody, $textBody);
+        $this->sendEmailViaMailjet((string) $user->getEmail(), 'SynergyGig — Verify Your Email', $htmlBody, $textBody);
     }
 
     /**
@@ -417,7 +416,7 @@ class AuthController extends AbstractController
             // Generate 6-digit OTP
             $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $user->setResetToken(password_hash($otp, PASSWORD_BCRYPT));
-            $user->setResetTokenExpiresAt(new \DateTime('+10 minutes'));
+            $user->initResetTokenExpiresAt(new \DateTime('+10 minutes'));
             $em->flush();
 
             // Store email in session for the verify step
@@ -469,7 +468,7 @@ class AuthController extends AbstractController
 
             if ($user->getResetTokenExpiresAt() < new \DateTime()) {
                 $user->setResetToken(null);
-                $user->setResetTokenExpiresAt(null);
+                $user->initResetTokenExpiresAt(null);
                 $em->flush();
                 $this->addFlash('error', 'The code has expired. Please request a new one.');
                 return $this->redirectToRoute('app_forgot_password');
@@ -522,7 +521,7 @@ class AuthController extends AbstractController
 
             $user->setPassword($hasher->hashPassword($user, $password));
             $user->setResetToken(null);
-            $user->setResetTokenExpiresAt(null);
+            $user->initResetTokenExpiresAt(null);
             $em->flush();
 
             // Cleanup session
@@ -543,13 +542,18 @@ class AuthController extends AbstractController
         throw new \LogicException('This should never be reached.');
     }
 
+    /** @return array<int, mixed>|null */
     private function extractFaceEncodingFromImage(string $imagePath): ?array
     {
-        $pythonScript = $this->getParameter('kernel.project_dir') . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
+        $projectDir = $this->getParameter('kernel.project_dir');
+        if (!is_string($projectDir)) {
+            throw new \RuntimeException('Invalid project directory configuration.');
+        }
+        $pythonScript = $projectDir . DIRECTORY_SEPARATOR . 'python' . DIRECTORY_SEPARATOR . 'face_encode_image.py';
         $cmd = sprintf('/usr/bin/python3 "%s" "%s"', $pythonScript, $imagePath);
         $output = $this->runProcessWithTimeout($cmd, self::FACE_PYTHON_TIMEOUT_SECONDS);
 
-        if ($output === null || trim($output) === '') {
+        if (trim($output) === '') {
             throw new \RuntimeException('Face recognition service unavailable.');
         }
 
@@ -558,7 +562,7 @@ class AuthController extends AbstractController
             throw new \RuntimeException('Unexpected face recognition output.');
         }
 
-        $result = json_decode(substr($output, $jsonStart), true);
+        $result = json_decode((string) substr($output, $jsonStart), true);
         if (!is_array($result) || !array_key_exists('success', $result)) {
             throw new \RuntimeException('Invalid face recognition response.');
         }
@@ -583,6 +587,10 @@ class AuthController extends AbstractController
         return $encoding;
     }
 
+    /**
+     * @param array<int, float|int|string> $a
+     * @param array<int, float|int|string> $b
+     */
     private function cosineDistance(array $a, array $b): ?float
     {
         $len = min(count($a), count($b));

@@ -41,6 +41,7 @@ class OfferController extends AbstractController
         if ($user) {
             $apps = $appRepo->findBy(['applicant' => $user]);
             foreach ($apps as $app) {
+                /** @var \App\Entity\JobApplication $app */
                 if ($app->getOffer()) {
                     $appliedOfferIds[] = $app->getOffer()->getId();
                 }
@@ -186,11 +187,12 @@ class OfferController extends AbstractController
 
         $application = new JobApplication();
         $application->setOffer($offer);
+        /** @var \App\Entity\User $user */
         $application->setApplicant($user);
         $application->setStatus('PENDING');
-        $application->setAppliedAt(new \DateTime());
+        $application->initAppliedAt(new \DateTime());
 
-        $coverLetter = trim($request->request->get('cover_letter', ''));
+        $coverLetter = trim((string) $request->request->get('cover_letter', ''));
         if ($coverLetter !== '') {
             $application->setCoverLetter($coverLetter);
         }

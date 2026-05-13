@@ -7,26 +7,35 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\ChatRoomRepository;
+use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: ChatRoomRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'chat_rooms')]
 class ChatRoom
 {
+    use TimestampTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'room', targetEntity: Message::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Message> */
+    #[ORM\OneToMany(mappedBy: 'room', targetEntity: Message::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $messages;
 
-    #[ORM\OneToMany(mappedBy: 'room', targetEntity: ChatRoomMember::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, ChatRoomMember> */
+    #[ORM\OneToMany(mappedBy: 'room', targetEntity: ChatRoomMember::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $members;
 
-    public function __construct()
+    public function __construct(?User $createdBy = null)
     {
         $this->messages = new ArrayCollection();
         $this->members = new ArrayCollection();
+        if ($createdBy !== null) {
+            $this->createdBy = $createdBy;
+        }
     }
 
     public function getId(): ?int
@@ -40,7 +49,10 @@ class ChatRoom
         return $this;
     }
 
+    /** @return Collection<int, Message> */
     public function getMessages(): Collection { return $this->messages; }
+
+    /** @return Collection<int, ChatRoomMember> */
     public function getMembers(): Collection { return $this->members; }
 
     #[ORM\Column(type: 'string', nullable: true)]
@@ -72,7 +84,7 @@ class ChatRoom
     }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'created_by', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id', nullable: false)]
     private ?User $createdBy = null;
 
     public function getCreatedBy(): ?User
@@ -80,34 +92,12 @@ class ChatRoom
         return $this->createdBy;
     }
 
-    public function setCreatedBy(?User $createdBy): self
+    /** @internal Use constructor to set blameable field */
+    /** @internal */ public function initCreatedBy(?User $createdBy): self
     {
-        $this->createdBy = $createdBy;
+        if ($this->createdBy === null) {
+            $this->createdBy = $createdBy;
+        }
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

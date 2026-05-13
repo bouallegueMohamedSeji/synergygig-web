@@ -109,7 +109,8 @@ class CvJobMatchService
 
     private function wordOverlapScore(string $cv, string $job): int
     {
-        $jobWords = array_unique(preg_split('/\W+/', $job));
+        $parts = preg_split('/\W+/', $job);
+        $jobWords = array_unique($parts === false ? [] : $parts);
         $jobWords = array_filter($jobWords, fn($w) => strlen($w) > 3);
         if (empty($jobWords)) return 0;
 

@@ -7,20 +7,26 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\TrainingCourseRepository;
+use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: TrainingCourseRepository::class)]
-#[ORM\Table(name: 'training_courses')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'training_course')]
 class TrainingCourse
 {
+    use TimestampTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'course', targetEntity: TrainingEnrollment::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, TrainingEnrollment> */
+    #[ORM\OneToMany(mappedBy: 'course', targetEntity: TrainingEnrollment::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $enrollments;
 
-    #[ORM\OneToMany(mappedBy: 'course', targetEntity: TrainingCertificate::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, TrainingCertificate> */
+    #[ORM\OneToMany(mappedBy: 'course', targetEntity: TrainingCertificate::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $certificates;
 
     public function __construct()
@@ -40,7 +46,9 @@ class TrainingCourse
         return $this;
     }
 
+    /** @return Collection<int, TrainingEnrollment> */
     public function getEnrollments(): Collection { return $this->enrollments; }
+    /** @return Collection<int, TrainingCertificate> */
     public function getCertificates(): Collection { return $this->certificates; }
 
     #[ORM\Column(type: 'string', nullable: false)]
@@ -282,7 +290,7 @@ class TrainingCourse
     }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'created_by', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id', nullable: false)]
     private ?User $createdBy = null;
 
     public function getCreatedBy(): ?User
@@ -290,36 +298,14 @@ class TrainingCourse
         return $this->createdBy;
     }
 
-    public function setCreatedBy(?User $createdBy): self
+    /** @internal Blameable field — set once at creation */
+    /** @internal */ public function initCreatedBy(?User $createdBy): self
     {
-        $this->createdBy = $createdBy;
+        if ($this->createdBy === null) {
+            $this->createdBy = $createdBy;
+        }
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $quiz_timer_seconds = null;
 

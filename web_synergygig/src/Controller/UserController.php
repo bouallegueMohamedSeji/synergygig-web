@@ -31,7 +31,7 @@ class UserController extends AbstractController
         $q = $request->query->get('q');
         if ($q) {
             $qb->andWhere('LOWER(CONCAT(u.first_name, \' \', u.last_name)) LIKE :q OR LOWER(u.email) LIKE :q')
-               ->setParameter('q', '%' . mb_strtolower($q) . '%');
+               ->setParameter('q', '%' . mb_strtolower((string) $q) . '%');
         }
 
         $pagination = $paginator->paginate($qb, $request->query->getInt('page', 1), 12);
@@ -46,7 +46,6 @@ class UserController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em, UserPasswordHasherInterface $hasher): Response
     {
         $user = new User();
-        $user->setCreated_at(new \DateTime());
         $user->setIs_active(true);
 
         $form = $this->createForm(UserType::class, $user, ['is_new' => true]);
@@ -100,7 +99,7 @@ class UserController extends AbstractController
     #[Route('/{id}/toggle-freeze', name: 'app_user_toggle_freeze', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function toggleFreeze(Request $request, User $user, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('freeze-' . $user->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('freeze-' . $user->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_user_show', ['id' => $user->getId()]);
         }
@@ -120,7 +119,7 @@ class UserController extends AbstractController
     #[Route('/{id}/delete', name: 'app_user_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, User $user, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete-' . $user->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-' . $user->getId(), (string) $request->request->get('_token'))) {
             $em->remove($user);
             $em->flush();
             $this->addFlash('success', 'User permanently deleted.');
@@ -132,7 +131,7 @@ class UserController extends AbstractController
     #[Route('/{id}/upload-avatar', name: 'app_user_upload_avatar', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function uploadAvatar(Request $request, User $user, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('avatar-' . $user->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('avatar-' . $user->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
         }
@@ -149,13 +148,15 @@ class UserController extends AbstractController
                 return $this->redirectToRoute('app_user_edit', ['id' => $user->getId()]);
             }
 
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/avatars';
+            /** @var string $projectDir */
+            $projectDir = $this->getParameter('kernel.project_dir');
+            $uploadDir = $projectDir . '/public/uploads/avatars';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
 
             if ($user->getAvatar_path()) {
-                $old = $uploadDir . '/' . $user->getAvatar_path();
+                $old = $uploadDir . '/' . (string) $user->getAvatar_path();
                 if (file_exists($old)) {
                     unlink($old);
                 }

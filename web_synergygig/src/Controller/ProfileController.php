@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Form\UserType;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,6 +29,9 @@ class ProfileController extends AbstractController
     public function edit(Request $request, EntityManagerInterface $em): Response
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
         $form = $this->createForm(UserType::class, $user, ['show_admin_fields' => false]);
         $form->handleRequest($request);
 
@@ -47,9 +51,12 @@ class ProfileController extends AbstractController
     public function changePassword(Request $request, UserPasswordHasherInterface $hasher, EntityManagerInterface $em): Response
     {
         $user = $this->getUser();
-        $current = $request->request->get('current_password', '');
-        $newPass = $request->request->get('new_password', '');
-        $confirm = $request->request->get('confirm_password', '');
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
+        $current = (string) $request->request->get('current_password', '');
+        $newPass = (string) $request->request->get('new_password', '');
+        $confirm = (string) $request->request->get('confirm_password', '');
 
         if (!$hasher->isPasswordValid($user, $current)) {
             $this->addFlash('error', 'Current password is incorrect.');
@@ -83,7 +90,10 @@ class ProfileController extends AbstractController
     public function uploadAvatar(Request $request, EntityManagerInterface $em): Response
     {
         $user = $this->getUser();
-        if (!$this->isCsrfTokenValid('avatar-self', $request->request->get('_token'))) {
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
+        if (!$this->isCsrfTokenValid('avatar-self', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_profile');
         }
@@ -100,7 +110,11 @@ class ProfileController extends AbstractController
                 return $this->redirectToRoute('app_profile');
             }
 
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/avatars';
+            $projectDir = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDir)) {
+                throw new \RuntimeException('Invalid project directory configuration.');
+            }
+            $uploadDir = $projectDir . '/public/uploads/avatars';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
@@ -128,7 +142,10 @@ class ProfileController extends AbstractController
     public function uploadCv(Request $request, EntityManagerInterface $em): Response
     {
         $user = $this->getUser();
-        if (!$this->isCsrfTokenValid('cv-upload', $request->request->get('_token'))) {
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
+        if (!$this->isCsrfTokenValid('cv-upload', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_profile');
         }
@@ -153,7 +170,11 @@ class ProfileController extends AbstractController
             return $this->redirectToRoute('app_profile');
         }
 
-        $uploadDir = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs';
+        $projectDir = $this->getParameter('kernel.project_dir');
+        if (!is_string($projectDir)) {
+            throw new \RuntimeException('Invalid project directory configuration.');
+        }
+        $uploadDir = $projectDir . '/var/uploads/cvs';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
@@ -172,7 +193,7 @@ class ProfileController extends AbstractController
 
         $user->setCvPath($filename);
         $user->setCvOriginalName($file->getClientOriginalName());
-        $user->setCvUploadedAt(new \DateTime());
+        $user->initCvUploadedAt(new \DateTime());
 
         // Extract plain text for skills matching (PDF only via pdftotext if available)
         $skillsText = null;
@@ -185,7 +206,7 @@ class ProfileController extends AbstractController
             }
         }
         // Fallback: use the CV skills textarea if provided
-        $manualSkills = trim($request->request->get('cv_skills_manual', ''));
+        $manualSkills = trim((string) $request->request->get('cv_skills_manual', ''));
         if ($manualSkills) {
             $skillsText = $manualSkills;
         }
@@ -204,11 +225,18 @@ class ProfileController extends AbstractController
     public function downloadCv(): Response
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
         if (!$user->getCvPath()) {
             throw $this->createNotFoundException('No CV uploaded.');
         }
 
-        $filePath = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs/' . $user->getCvPath();
+        $projectDir = $this->getParameter('kernel.project_dir');
+        if (!is_string($projectDir)) {
+            throw new \RuntimeException('Invalid project directory configuration.');
+        }
+        $filePath = $projectDir . '/var/uploads/cvs/' . $user->getCvPath();
         if (!file_exists($filePath)) {
             throw $this->createNotFoundException('CV file not found.');
         }
@@ -227,19 +255,26 @@ class ProfileController extends AbstractController
     public function deleteCv(Request $request, EntityManagerInterface $em): Response
     {
         $user = $this->getUser();
-        if (!$this->isCsrfTokenValid('cv-delete', $request->request->get('_token'))) {
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
+        if (!$this->isCsrfTokenValid('cv-delete', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_profile');
         }
 
         if ($user->getCvPath()) {
-            $filePath = $this->getParameter('kernel.project_dir') . '/var/uploads/cvs/' . $user->getCvPath();
+            $projectDir = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDir)) {
+                throw new \RuntimeException('Invalid project directory configuration.');
+            }
+            $filePath = $projectDir . '/var/uploads/cvs/' . $user->getCvPath();
             if (file_exists($filePath)) {
                 unlink($filePath);
             }
             $user->setCvPath(null);
             $user->setCvOriginalName(null);
-            $user->setCvUploadedAt(null);
+            $user->initCvUploadedAt(null);
             $user->setCvSkillsText(null);
             $em->flush();
             $this->addFlash('success', 'CV removed.');
@@ -253,6 +288,9 @@ class ProfileController extends AbstractController
     public function cvKeywords(): \Symfony\Component\HttpFoundation\JsonResponse
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
         $text = $user->getCvSkillsText() ?? ($user->getBio() ?? '');
         return $this->json([
             'hasCV'  => $user->getCvPath() !== null,

@@ -43,6 +43,7 @@ class ChatController extends AbstractController
         }
         $memberships = $memberRepo->findBy(['user' => $user]);
         $rooms = [];
+        /** @var ChatRoomMember $m */
         foreach ($memberships as $m) {
             $room = $m->getRoom();
             if (!$room) continue;
@@ -52,9 +53,9 @@ class ChatController extends AbstractController
             $displayName = $room->getName();
             if ($room->getType() === 'DIRECT') {
                 $otherMember = $memberRepo->findOtherMember($room, $user);
-                if ($otherMember) {
+                if ($otherMember && $otherMember->getUser()) {
                     $other = $otherMember->getUser();
-                    $displayName = $other->getFirstName() . ' ' . $other->getLastName();
+                    $displayName = (string) $other->getFirstName() . ' ' . (string) $other->getLastName();
                 }
             }
 
@@ -107,6 +108,7 @@ class ChatController extends AbstractController
         $memberships = $memberRepo->findBy(['user' => $user]);
 
         $rooms = [];
+        /** @var ChatRoomMember $m */
         foreach ($memberships as $m) {
             $room = $m->getRoom();
             if (!$room) continue;
@@ -115,9 +117,9 @@ class ChatController extends AbstractController
             $displayName = $room->getName();
             if ($room->getType() === 'DIRECT') {
                 $otherMember = $memberRepo->findOtherMember($room, $user);
-                if ($otherMember) {
+                if ($otherMember && $otherMember->getUser()) {
                     $other = $otherMember->getUser();
-                    $displayName = $other->getFirstName() . ' ' . $other->getLastName();
+                    $displayName = (string) $other->getFirstName() . ' ' . (string) $other->getLastName();
                 }
             }
 
@@ -139,9 +141,9 @@ class ChatController extends AbstractController
         $activeDisplayName = $activeRoom->getName();
         if ($activeRoom->getType() === 'DIRECT') {
             $otherMember = $memberRepo->findOtherMember($activeRoom, $user);
-            if ($otherMember) {
+            if ($otherMember && $otherMember->getUser()) {
                 $other = $otherMember->getUser();
-                $activeDisplayName = $other->getFirstName() . ' ' . $other->getLastName();
+                $activeDisplayName = (string) $other->getFirstName() . ' ' . (string) $other->getLastName();
             }
         }
 
@@ -181,11 +183,11 @@ class ChatController extends AbstractController
             return $this->redirectToRoute('app_chat_index');
         }
 
-        if (!$this->isCsrfTokenValid('chat_send', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('chat_send', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_chat_room', ['id' => $room->getId()]);
         }
-        $content = trim($request->request->get('content', ''));
+        $content = trim((string) $request->request->get('content', ''));
         $file = $request->files->get('attachment');
 
         if ($content !== '' || $file) {
@@ -193,13 +195,17 @@ class ChatController extends AbstractController
             $msg->setSender($user);
             $msg->setRoom($room);
             $msg->setContent($content !== '' ? $content : null);
-            $msg->setTimestamp(new \DateTime());
+            $msg->initTimestamp(new \DateTime());
 
             if ($file) {
                 $originalName = $file->getClientOriginalName();
-                $safeName = $slugger->slug(pathinfo($originalName, PATHINFO_FILENAME));
+                $safeName = $slugger->slug((string) pathinfo($originalName, PATHINFO_FILENAME));
                 $newFilename = $safeName . '-' . uniqid() . '.' . $file->guessExtension();
-                $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/chat';
+                $projectDir = $this->getParameter('kernel.project_dir');
+                if (!is_string($projectDir)) {
+                    throw new \RuntimeException('Invalid project directory configuration.');
+                }
+                $uploadDir = $projectDir . '/public/uploads/chat';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0775, true);
                 }
@@ -231,7 +237,7 @@ class ChatController extends AbstractController
             $this->addFlash('danger', 'You must be logged in to access chat.');
             return $this->redirectToRoute('app_login');
         }
-        $name = trim($request->request->get('name', ''));
+        $name = trim((string) $request->request->get('name', ''));
         if ($name === '') {
             $this->addFlash('warning', 'Room name is required.');
             return $this->redirectToRoute('app_chat_index');
@@ -240,8 +246,7 @@ class ChatController extends AbstractController
         $room = new ChatRoom();
         $room->setName($name);
         $room->setType('GROUP');
-        $room->setCreatedBy($user);
-        $room->setCreatedAt(new \DateTime());
+        $room->initCreatedBy($user);
         $em->persist($room);
 
         // Add creator as OWNER
@@ -249,7 +254,7 @@ class ChatController extends AbstractController
         $member->setRoom($room);
         $member->setUser($user);
         $member->setRole('OWNER');
-        $member->setJoinedAt(new \DateTime());
+        $member->initJoinedAt(new \DateTime());
         $em->persist($member);
 
         $em->flush();
@@ -289,22 +294,21 @@ class ChatController extends AbstractController
         $room = new ChatRoom();
         $room->setName($dmName);
         $room->setType('DIRECT');
-        $room->setCreatedBy($user);
-        $room->setCreatedAt(new \DateTime());
+        $room->initCreatedBy($user);
         $em->persist($room);
 
         $m1 = new ChatRoomMember();
         $m1->setRoom($room);
         $m1->setUser($user);
         $m1->setRole('MEMBER');
-        $m1->setJoinedAt(new \DateTime());
+        $m1->initJoinedAt(new \DateTime());
         $em->persist($m1);
 
         $m2 = new ChatRoomMember();
         $m2->setRoom($room);
         $m2->setUser($other);
         $m2->setRole('MEMBER');
-        $m2->setJoinedAt(new \DateTime());
+        $m2->initJoinedAt(new \DateTime());
         $em->persist($m2);
 
         $em->flush();
@@ -328,6 +332,7 @@ class ChatController extends AbstractController
             $this->addFlash('danger', 'You must be logged in to access chat.');
             return $this->redirectToRoute('app_login');
         }
+        /** @var ChatRoomMember|null $currentMembership */
         $currentMembership = $memberRepo->findOneBy(['room' => $room, 'user' => $currentUser]);
         if (!$this->isGranted('ROLE_ADMIN') && (!$currentMembership || $currentMembership->getRole() !== 'OWNER')) {
             $this->addFlash('warning', 'Only the room owner can add members.');
@@ -352,7 +357,7 @@ class ChatController extends AbstractController
         $member->setRoom($room);
         $member->setUser($target);
         $member->setRole('MEMBER');
-        $member->setJoinedAt(new \DateTime());
+        $member->initJoinedAt(new \DateTime());
         $em->persist($member);
         $em->flush();
 
@@ -369,17 +374,20 @@ class ChatController extends AbstractController
         Request $request,
         EntityManagerInterface $em
     ): Response {
-        $roomId = $message->getRoom()->getId();
+        $roomId = $message->getRoom()?->getId();
+        if ($roomId === null) {
+            return $this->redirectToRoute('app_chat_index');
+        }
         $currentUser = $this->getAuthenticatedUser();
         if (!$currentUser) {
             $this->addFlash('danger', 'You must be logged in to access chat.');
             return $this->redirectToRoute('app_login');
         }
-        if ($message->getSender()->getId() !== $currentUser->getId()) {
+        if ($message->getSender()?->getId() !== $currentUser->getId()) {
             $this->addFlash('warning', 'Cannot edit other users\' messages.');
             return $this->redirectToRoute('app_chat_room', ['id' => $roomId]);
         }
-        $newContent = trim($request->request->get('content', ''));
+        $newContent = trim((string) $request->request->get('content', ''));
         if ($newContent !== '') {
             $message->setContent($newContent);
             $message->setIsEdited(true);
@@ -397,18 +405,21 @@ class ChatController extends AbstractController
         Request $request,
         EntityManagerInterface $em
     ): Response {
-        $roomId = $message->getRoom()->getId();
+        $roomId = $message->getRoom()?->getId();
+        if ($roomId === null) {
+            return $this->redirectToRoute('app_chat_index');
+        }
         $currentUser = $this->getAuthenticatedUser();
         if (!$currentUser) {
             $this->addFlash('danger', 'You must be logged in to access chat.');
             return $this->redirectToRoute('app_login');
         }
         // Only the sender or an admin can delete a message
-        if ($message->getSender()->getId() !== $currentUser->getId() && !$this->isGranted('ROLE_ADMIN')) {
+        if ($message->getSender()?->getId() !== $currentUser->getId() && !$this->isGranted('ROLE_ADMIN')) {
             $this->addFlash('warning', 'You can only delete your own messages.');
             return $this->redirectToRoute('app_chat_room', ['id' => $roomId]);
         }
-        if ($this->isCsrfTokenValid('delete' . $message->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $message->getId(), (string) $request->request->get('_token'))) {
             $em->remove($message);
             $em->flush();
         }

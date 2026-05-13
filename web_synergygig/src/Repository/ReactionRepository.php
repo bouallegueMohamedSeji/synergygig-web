@@ -6,6 +6,8 @@ use App\Entity\Reaction;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/** @extends ServiceEntityRepository<Reaction> */
+
 class ReactionRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,3 +17,5 @@ class ReactionRepository extends ServiceEntityRepository
 
     // Add custom methods as needed
 }
+
+

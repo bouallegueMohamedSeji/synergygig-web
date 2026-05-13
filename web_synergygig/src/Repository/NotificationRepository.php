@@ -3,8 +3,11 @@
 namespace App\Repository;
 
 use App\Entity\Notification;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+
+/** @extends ServiceEntityRepository<Notification> */
 
 class NotificationRepository extends ServiceEntityRepository
 {
@@ -13,5 +16,17 @@ class NotificationRepository extends ServiceEntityRepository
         parent::__construct($registry, Notification::class);
     }
 
-    // Add custom methods as needed
+    public function countUnreadByUser(User $user): int
+    {
+        return (int) $this->createQueryBuilder('n')
+            ->select('COUNT(n.id)')
+            ->where('n.user = :user')
+            ->andWhere('n.is_read = :isRead')
+            ->setParameter('user', $user)
+            ->setParameter('isRead', false)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }
+
+

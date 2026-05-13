@@ -12,6 +12,9 @@ doctrine:
         default_table_options:
             collation: utf8mb4_unicode_ci
             charset: utf8mb4
+            engine: InnoDB
+        options:
+            1002: "SET sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'"
         types:
             enum: Doctrine\DBAL\Types\StringType
         mapping_types:
@@ -28,3 +31,8 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Entity'
                 prefix: 'App\Entity'
                 alias: App
+
+when@prod:
+    doctrine:
+        orm:
+            auto_generate_proxy_classes: false

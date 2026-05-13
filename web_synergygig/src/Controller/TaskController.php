@@ -40,7 +40,7 @@ class TaskController extends AbstractController
 
         $q = $request->query->get('q');
         if ($q) {
-            $qb->andWhere('LOWER(t.title) LIKE :q')->setParameter('q', '%' . mb_strtolower($q) . '%');
+            $qb->andWhere('LOWER(t.title) LIKE :q')->setParameter('q', '%' . mb_strtolower((string) $q) . '%');
         }
 
         $status = $request->query->get('status');
@@ -65,7 +65,6 @@ class TaskController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $task->setCreatedAt(new \DateTime());
             $em->persist($task);
             $em->flush();
             $this->addFlash('success', 'Task created.');
@@ -116,7 +115,7 @@ class TaskController extends AbstractController
         if (!$this->isGranted('ROLE_ADMIN') && $task->getProject()?->getOwner() !== $this->getUser()) {
             throw $this->createAccessDeniedException('You can only delete tasks in your own projects.');
         }
-        if ($this->isCsrfTokenValid('delete' . $task->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $task->getId(), (string) $request->request->get('_token'))) {
             $em->remove($task);
             $em->flush();
             $this->addFlash('success', 'Task deleted.');
@@ -133,7 +132,7 @@ class TaskController extends AbstractController
             return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
         }
 
-        if (!$this->isCsrfTokenValid('submit' . $task->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('submit' . $task->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
         }
@@ -173,7 +172,11 @@ class TaskController extends AbstractController
             }
 
             $filename = 'task_' . $task->getId() . '_' . uniqid() . '.' . $ext;
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/tasks';
+            $projectDir = $this->getParameter('kernel.project_dir');
+            if (!is_string($projectDir)) {
+                throw new \RuntimeException('Invalid project directory configuration.');
+            }
+            $uploadDir = $projectDir . '/public/uploads/tasks';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0775, true);
             }
@@ -200,7 +203,7 @@ class TaskController extends AbstractController
             throw $this->createAccessDeniedException('Only the project owner can review this task.');
         }
 
-        if (!$this->isCsrfTokenValid('review' . $task->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('review' . $task->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_task_show', ['id' => $task->getId()]);
         }
@@ -239,7 +242,7 @@ class TaskController extends AbstractController
         $task->setReviewStatus($reviewStatus);
         $task->setReviewRating($reviewRating);
         $task->setReviewFeedback($reviewFeedback);
-        $task->setReviewDate(new \DateTime());
+        $task->initReviewDate(new \DateTime());
 
         if ($reviewStatus === 'APPROVED') {
             $task->setStatus('DONE');

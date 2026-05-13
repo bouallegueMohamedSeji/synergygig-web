@@ -50,7 +50,7 @@ class ExchangeRateService
             return null;
         }
 
-        $data = json_decode($response, true);
+        $data = json_decode((string) $response, true);
         if (($data['result'] ?? '') !== 'success') {
             $this->logger->warning('ExchangeRate-API error', ['response' => $data]);
             return null;

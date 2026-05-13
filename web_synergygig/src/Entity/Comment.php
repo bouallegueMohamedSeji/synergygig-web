@@ -7,17 +7,21 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\CommentRepository;
+use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: CommentRepository::class)]
-#[ORM\Table(name: 'comments')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'comment')]
 class Comment
 {
+    use TimestampTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'parent', targetEntity: Comment::class, cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'parent', targetEntity: Comment::class, cascade: ['persist', 'remove'])]
     private Collection $replies;
 
     public function __construct()
@@ -39,7 +43,7 @@ class Comment
     public function getReplies(): Collection { return $this->replies; }
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'comments')]
-    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'post_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Post $post = null;
 
     public function getPost(): ?Post
@@ -54,7 +58,7 @@ class Comment
     }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'author_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'author_id', referencedColumnName: 'id', nullable: false)]
     private ?User $author = null;
 
     public function getAuthor(): ?User
@@ -62,9 +66,12 @@ class Comment
         return $this->author;
     }
 
-    public function setAuthor(?User $author): self
+    /** @internal Blameable field — set once at creation */
+    /** @internal */ public function initAuthor(?User $author): self
     {
-        $this->author = $author;
+        if ($this->author === null) {
+            $this->author = $author;
+        }
         return $this;
     }
 
@@ -83,7 +90,7 @@ class Comment
     }
 
     #[ORM\ManyToOne(targetEntity: Comment::class, inversedBy: 'replies')]
-    #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     private ?Comment $parent = null;
 
     public function getParent(): ?Comment
@@ -96,29 +103,4 @@ class Comment
         $this->parent = $parent;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

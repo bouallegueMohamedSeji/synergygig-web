@@ -98,7 +98,7 @@ class ApiAuthController extends AbstractController
         $user->setFirstName($firstName);
         $user->setLastName($lastName);
         $user->setRole('EMPLOYEE');
-        $user->setCreated_at(new \DateTime());
+        $user->setCreatedAt(new \DateTime());
         $user->setPassword($hasher->hashPassword($user, $password));
 
         $em->persist($user);

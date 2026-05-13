@@ -8,6 +8,7 @@ use App\Repository\CallRepository;
 use App\Repository\CallSignalRepository;
 use App\Repository\UserRepository;
 use App\Repository\ChatRoomRepository;
+use App\Entity\User;
 use App\Repository\ChatRoomMemberRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -48,6 +49,9 @@ class CallController extends AbstractController
         EntityManagerInterface $em
     ): JsonResponse {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
         $room = $roomRepo->find($roomId);
         if (!$room) {
             return $this->json(['error' => 'Room not found'], 404);
@@ -57,7 +61,7 @@ class CallController extends AbstractController
         $active = $callRepo->findActiveCall($user);
         if ($active) {
             $active->setStatus('ENDED');
-            $active->setEndedAt(new \DateTime());
+            $active->initEndedAt(new \DateTime());
             $em->flush();
         }
 
@@ -66,14 +70,13 @@ class CallController extends AbstractController
         $call->setRoomId($roomId);
         $call->setCallType(strtoupper($type) === 'VIDEO' ? 'VIDEO' : 'AUDIO');
         $call->setStatus('RINGING');
-        $call->setCreatedAt(new \DateTime());
-
         $calleeName = null;
         if ($room->getType() === 'DIRECT') {
             $otherMember = $memberRepo->findOtherMember($room, $user);
-            if ($otherMember) {
-                $call->setCallee($otherMember->getUser());
-                $calleeName = $otherMember->getUser()->getFirstName() . ' ' . $otherMember->getUser()->getLastName();
+            if ($otherMember && $otherMember->getUser()) {
+                $callee = $otherMember->getUser();
+                $call->setCallee($callee);
+                $calleeName = (string) $callee->getFirstName() . ' ' . (string) $callee->getLastName();
             }
         }
 
@@ -95,23 +98,21 @@ class CallController extends AbstractController
     public function popup(Call $call, CsrfTokenManagerInterface $csrfTokenManager): Response
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
         $isCaller = $call->getCaller() && $call->getCaller()->getId() === $user->getId();
+
+        $callee = $call->getCallee();
+        $caller = $call->getCaller();
 
         // Determine the other person's name
         if ($isCaller) {
-            $peerName = $call->getCallee()
-                ? $call->getCallee()->getFirstName() . ' ' . $call->getCallee()->getLastName()
-                : 'Unknown';
-            $peerInitials = $call->getCallee()
-                ? substr($call->getCallee()->getFirstName(), 0, 1) . substr($call->getCallee()->getLastName(), 0, 1)
-                : '?';
+            $peerName = $callee ? (string) $callee->getFirstName() . ' ' . (string) $callee->getLastName() : 'Unknown';
+            $peerInitials = $callee ? substr((string) $callee->getFirstName(), 0, 1) . substr((string) $callee->getLastName(), 0, 1) : '?';
         } else {
-            $peerName = $call->getCaller()
-                ? $call->getCaller()->getFirstName() . ' ' . $call->getCaller()->getLastName()
-                : 'Unknown';
-            $peerInitials = $call->getCaller()
-                ? substr($call->getCaller()->getFirstName(), 0, 1) . substr($call->getCaller()->getLastName(), 0, 1)
-                : '?';
+            $peerName = $caller ? (string) $caller->getFirstName() . ' ' . (string) $caller->getLastName() : 'Unknown';
+            $peerInitials = $caller ? substr((string) $caller->getFirstName(), 0, 1) . substr((string) $caller->getLastName(), 0, 1) : '?';
         }
 
         return $this->render('call/popup.html.twig', [
@@ -130,9 +131,12 @@ class CallController extends AbstractController
     public function acceptAjax(Call $call, EntityManagerInterface $em): JsonResponse
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
         if ($call->getStatus() === 'RINGING') {
             $call->setStatus('CONNECTED');
-            $call->setStartedAt(new \DateTime());
+            $call->initStartedAt(new \DateTime());
             if (!$call->getCallee()) {
                 $call->setCallee($user);
             }
@@ -149,7 +153,7 @@ class CallController extends AbstractController
     {
         if ($call->getStatus() === 'RINGING') {
             $call->setStatus('REJECTED');
-            $call->setEndedAt(new \DateTime());
+            $call->initEndedAt(new \DateTime());
             $em->flush();
         }
         return $this->json(['status' => $call->getStatus()]);
@@ -165,16 +169,21 @@ class CallController extends AbstractController
         CallSignalRepository $signalRepo
     ): JsonResponse {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
         $userId = $user->getId();
         if ($call->getCaller()?->getId() !== $userId && $call->getCallee()?->getId() !== $userId) {
             return $this->json(['error' => 'Unauthorized'], 403);
         }
         if (in_array($call->getStatus(), ['RINGING', 'CONNECTED'])) {
             $call->setStatus('ENDED');
-            $call->setEndedAt(new \DateTime());
+            $call->initEndedAt(new \DateTime());
             $em->flush();
             // Clean up signals
-            $signalRepo->deleteForCall($call->getId());
+            if ($call->getId() !== null) {
+                $signalRepo->deleteForCall($call->getId());
+            }
         }
         return $this->json(['status' => $call->getStatus()]);
     }
@@ -186,8 +195,11 @@ class CallController extends AbstractController
     public function signalSend(Request $request, EntityManagerInterface $em, CallRepository $callRepo): JsonResponse
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
         $data = json_decode($request->getContent(), true);
-        if (!$data || !isset($data['callId'], $data['type'], $data['payload'])) {
+        if (!is_array($data) || !isset($data['callId'], $data['type'], $data['payload'])) {
             return $this->json(['error' => 'Missing fields'], 400);
         }
 
@@ -199,10 +211,12 @@ class CallController extends AbstractController
         $signal = new CallSignal();
         $signal->setCall($call);
         $signal->setFromUser($user);
-        $signal->setSignalType($data['type']);
-        $signal->setPayload(json_encode($data['payload']));
-        $signal->setCreatedAt(new \DateTime());
-
+        $signal->setSignalType((string) $data['type']);
+        $payload = json_encode($data['payload']);
+        if ($payload === false) {
+            return $this->json(['error' => 'Invalid payload'], 400);
+        }
+        $signal->setPayload($payload);
         $em->persist($signal);
         $em->flush();
 
@@ -220,6 +234,9 @@ class CallController extends AbstractController
         CallRepository $callRepo
     ): JsonResponse {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
         $afterId = (int) $request->query->get('after', 0);
 
         $call = $callRepo->find($callId);
@@ -227,14 +244,18 @@ class CallController extends AbstractController
             return $this->json(['error' => 'Call not found'], 404);
         }
 
-        $signals = $signalRepo->findNewSignals($callId, $user->getId(), $afterId);
+        $userId = $user->getId();
+        if ($userId === null) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+        $signals = $signalRepo->findNewSignals($callId, $userId, $afterId);
 
         return $this->json([
             'callStatus' => $call->getStatus(),
             'signals'    => array_map(fn(CallSignal $s) => [
                 'id'      => $s->getId(),
                 'type'    => $s->getSignalType(),
-                'payload' => json_decode($s->getPayload(), true),
+                'payload' => json_decode((string) $s->getPayload(), true),
             ], $signals),
         ]);
     }
@@ -246,6 +267,9 @@ class CallController extends AbstractController
     public function status(CallRepository $callRepo): JsonResponse
     {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['active' => null, 'incoming' => []]);
+        }
         $active = $callRepo->findActiveCall($user);
         $incoming = $callRepo->findIncomingForUser($user);
 
@@ -287,6 +311,10 @@ class CallController extends AbstractController
         EntityManagerInterface $em
     ): Response {
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            $this->addFlash('warning', 'You must be logged in.');
+            return $this->redirectToRoute('app_chat_index');
+        }
         $room = $roomRepo->find($roomId);
         if (!$room) {
             $this->addFlash('warning', 'Room not found.');
@@ -296,7 +324,7 @@ class CallController extends AbstractController
         $active = $callRepo->findActiveCall($user);
         if ($active) {
             $active->setStatus('ENDED');
-            $active->setEndedAt(new \DateTime());
+            $active->initEndedAt(new \DateTime());
             $em->flush();
         }
 
@@ -305,8 +333,6 @@ class CallController extends AbstractController
         $call->setRoomId($roomId);
         $call->setCallType(strtoupper($type) === 'VIDEO' ? 'VIDEO' : 'AUDIO');
         $call->setStatus('RINGING');
-        $call->setCreatedAt(new \DateTime());
-
         if ($room->getType() === 'DIRECT') {
             $otherMember = $memberRepo->findOtherMember($room, $user);
             if ($otherMember) {
@@ -325,15 +351,16 @@ class CallController extends AbstractController
     #[Route('/{id}/accept', name: 'app_call_accept', methods: ['POST'])]
     public function accept(Call $call, Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_call_index');
         }
+        $currentUser = $this->getUser();
         if ($call->getStatus() === 'RINGING') {
             $call->setStatus('CONNECTED');
-            $call->setStartedAt(new \DateTime());
-            if (!$call->getCallee()) {
-                $call->setCallee($this->getUser());
+            $call->initStartedAt(new \DateTime());
+            if (!$call->getCallee() && $currentUser instanceof User) {
+                $call->setCallee($currentUser);
             }
             $em->flush();
         }
@@ -343,13 +370,13 @@ class CallController extends AbstractController
     #[Route('/{id}/reject', name: 'app_call_reject', methods: ['POST'])]
     public function reject(Call $call, Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_call_index');
         }
         if ($call->getStatus() === 'RINGING') {
             $call->setStatus('REJECTED');
-            $call->setEndedAt(new \DateTime());
+            $call->initEndedAt(new \DateTime());
             $em->flush();
         }
         return $this->redirectToRoute('app_call_index');
@@ -358,18 +385,22 @@ class CallController extends AbstractController
     #[Route('/{id}/end', name: 'app_call_end', methods: ['POST'])]
     public function end(Call $call, Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('call_action' . $call->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_call_index');
         }
         $user = $this->getUser();
+        if (!$user instanceof User) {
+            $this->addFlash('danger', 'You must be logged in.');
+            return $this->redirectToRoute('app_call_index');
+        }
         if ($call->getCaller() !== $user && $call->getCallee() !== $user) {
             $this->addFlash('danger', 'You are not part of this call.');
             return $this->redirectToRoute('app_call_index');
         }
         if (in_array($call->getStatus(), ['RINGING', 'CONNECTED'])) {
             $call->setStatus('ENDED');
-            $call->setEndedAt(new \DateTime());
+            $call->initEndedAt(new \DateTime());
             $em->flush();
         }
         return $this->redirectToRoute('app_call_index');

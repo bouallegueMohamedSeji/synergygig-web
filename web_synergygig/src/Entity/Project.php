@@ -7,20 +7,28 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\ProjectRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: ProjectRepository::class)]
-#[ORM\Table(name: 'projects')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'project')]
 class Project
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Task> */
+    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $tasks;
 
-    #[ORM\OneToMany(mappedBy: 'project', targetEntity: ProjectMember::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, ProjectMember> */
+    #[ORM\OneToMany(mappedBy: 'project', targetEntity: ProjectMember::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $projectMembers;
 
     public function __construct()
@@ -40,7 +48,9 @@ class Project
         return $this;
     }
 
+    /** @return Collection<int, Task> */
     public function getTasks(): Collection { return $this->tasks; }
+    /** @return Collection<int, ProjectMember> */
     public function getProjectMembers(): Collection { return $this->projectMembers; }
 
     #[ORM\Column(type: 'string', nullable: false)]
@@ -137,31 +147,6 @@ class Project
         $this->status = $status;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
     #[ORM\ManyToOne(targetEntity: Department::class)]
     #[ORM\JoinColumn(name: 'department_id', referencedColumnName: 'id')]
     private ?Department $department = null;

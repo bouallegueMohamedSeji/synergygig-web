@@ -36,10 +36,10 @@ class AttendanceController extends AbstractController
         $dateFrom = $request->query->get('date_from');
         $dateTo = $request->query->get('date_to');
         if ($dateFrom) {
-            $qb->andWhere('a.date >= :dateFrom')->setParameter('dateFrom', new \DateTime($dateFrom));
+            $qb->andWhere('a.date >= :dateFrom')->setParameter('dateFrom', new \DateTime((string) $dateFrom));
         }
         if ($dateTo) {
-            $qb->andWhere('a.date <= :dateTo')->setParameter('dateTo', new \DateTime($dateTo));
+            $qb->andWhere('a.date <= :dateTo')->setParameter('dateTo', new \DateTime((string) $dateTo));
         }
 
         $pagination = $paginator->paginate($qb, $request->query->getInt('page', 1), 20);
@@ -70,7 +70,6 @@ class AttendanceController extends AbstractController
                     'is_edit' => false,
                 ]);
             }
-            $attendance->setCreatedAt(new \DateTime());
             $this->detectLateStatus($attendance);
             $em->persist($attendance);
             $em->flush();
@@ -130,7 +129,7 @@ class AttendanceController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function delete(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $attendance->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $attendance->getId(), (string) $request->request->get('_token'))) {
             $em->remove($attendance);
             $em->flush();
             $this->addFlash('success', 'Attendance record deleted.');
@@ -143,7 +142,7 @@ class AttendanceController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function approve(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('approve' . $attendance->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('approve' . $attendance->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_attendance_index');
         }
@@ -159,11 +158,11 @@ class AttendanceController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function reject(Request $request, Attendance $attendance, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('reject' . $attendance->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('reject' . $attendance->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_attendance_index');
         }
-        $reason = trim($request->request->get('rejection_reason', ''));
+        $reason = trim((string) $request->request->get('rejection_reason', ''));
         $attendance->setApprovalStatus('REJECTED');
         $attendance->setRejectionReason($reason ?: null);
         $em->flush();
@@ -203,7 +202,7 @@ class AttendanceController extends AbstractController
     #[Route('/checkin', name: 'app_attendance_checkin', methods: ['POST'])]
     public function checkin(Request $request, EntityManagerInterface $em, AttendanceRepository $repo): Response
     {
-        if (!$this->isCsrfTokenValid('attendance_checkin', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('attendance_checkin', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_attendance_index');
         }
@@ -228,7 +227,7 @@ class AttendanceController extends AbstractController
             $existing = new Attendance();
             $existing->setUser($user);
             $existing->setDate($today);
-            $existing->setCreatedAt($now);
+            $existing->initCreatedAt();
             $em->persist($existing);
         }
 
@@ -245,7 +244,7 @@ class AttendanceController extends AbstractController
     #[Route('/checkout', name: 'app_attendance_checkout', methods: ['POST'])]
     public function checkout(Request $request, EntityManagerInterface $em, AttendanceRepository $repo): Response
     {
-        if (!$this->isCsrfTokenValid('attendance_checkout', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('attendance_checkout', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_attendance_index');
         }
@@ -276,6 +275,7 @@ class AttendanceController extends AbstractController
 
     // ── Business logic ──
 
+    /** @return string[] */
     private function validateAttendance(Attendance $attendance): array
     {
         $errors = [];

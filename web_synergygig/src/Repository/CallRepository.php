@@ -3,11 +3,14 @@
 namespace App\Repository;
 
 use App\Entity\Call;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use DateTime;
 
-class CallRepository extends ServiceEntityRepository {
+/** @extends ServiceEntityRepository<Call> */
+class CallRepository extends ServiceEntityRepository
+{
     public function __construct(ManagerRegistry $registry) {
         parent::__construct($registry, Call::class);
     }
@@ -20,7 +23,8 @@ class CallRepository extends ServiceEntityRepository {
         }
     }
 
-    public function findIncomingForUser($user): array {
+    /** @return list<Call> */
+    public function findIncomingForUser(User $user): array {
         return $this->createQueryBuilder('c')
             ->where('c.callee = :user')
             ->andWhere('c.status = :status')
@@ -30,7 +34,11 @@ class CallRepository extends ServiceEntityRepository {
             ->getResult();
     }
 
-    /** Find incoming RINGING calls by raw callee user ID (used by JWT API). */
+    /**
+     * Find incoming RINGING calls by raw callee user ID (used by JWT API).
+     *
+     * @return list<Call>
+     */
     public function findIncomingForUserById(int $userId): array {
         return $this->createQueryBuilder('c')
             ->join('c.callee', 'u')
@@ -58,7 +66,8 @@ class CallRepository extends ServiceEntityRepository {
             ->getOneOrNullResult();
     }
 
-    public function findCallHistory($user, int $limit = 50): array {
+    /** @return list<Call> */
+    public function findCallHistory(User $user, int $limit = 50): array {
         return $this->createQueryBuilder('c')
             ->where('c.caller = :user OR c.callee = :user')
             ->andWhere('c.status IN (:statuses)')
@@ -70,7 +79,7 @@ class CallRepository extends ServiceEntityRepository {
             ->getResult();
     }
 
-    public function findActiveCall($user): ?Call {
+    public function findActiveCall(User $user): ?Call {
         return $this->createQueryBuilder('c')
             ->where('(c.caller = :user OR c.callee = :user)')
             ->andWhere('c.status IN (:statuses)')
@@ -81,3 +90,6 @@ class CallRepository extends ServiceEntityRepository {
             ->getOneOrNullResult();
     }
 }
+
+
+

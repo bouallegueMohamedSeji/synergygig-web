@@ -36,7 +36,7 @@ class ApiProjectController extends AbstractController
         $taskRepo = $em->getRepository(Task::class);
 
         if ($this->isGranted('ROLE_HR') || $this->isGranted('ROLE_ADMIN')) {
-            $projects = $repo->findBy([], ['id' => 'DESC']);
+            $projects = $repo->findBy([], ['id' => 'DESC'], 100);
         } elseif ($this->isGranted('ROLE_PROJECT_OWNER')) {
             $projects = $repo->findBy(['owner' => $currentUser], ['id' => 'DESC']);
         } else {
@@ -183,7 +183,7 @@ class ApiProjectController extends AbstractController
         $project->setDescription(isset($data['description']) ? (string) $data['description'] : null);
         $project->setOwner($owner);
         $project->setStatus($this->normalizeProjectStatus((string) ($data['status'] ?? 'PLANNING')));
-        $project->setCreatedAt(new \DateTimeImmutable());
+        $project->initCreatedAt();
 
         if (!empty($data['start_date'])) {
             try {
@@ -327,6 +327,7 @@ class ApiProjectController extends AbstractController
         return in_array($normalized, $valid, true) ? $normalized : 'PLANNING';
     }
 
+    /** @return array<string, mixed> */
     private function serializeProject(Project $project): array
     {
         return [

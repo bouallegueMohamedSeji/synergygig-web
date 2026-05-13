@@ -17,7 +17,8 @@ class JobApplication
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'application', targetEntity: Interview::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Interview> */
+    #[ORM\OneToMany(mappedBy: 'application', targetEntity: Interview::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $interviews;
 
     public function __construct()
@@ -36,10 +37,11 @@ class JobApplication
         return $this;
     }
 
+    /** @return Collection<int, Interview> */
     public function getInterviews(): Collection { return $this->interviews; }
 
     #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'jobApplications')]
-    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Offer $offer = null;
 
     public function getOffer(): ?Offer
@@ -167,15 +169,16 @@ class JobApplication
         return $this->getApplied_at();
     }
 
-    public function setApplied_at(\DateTimeInterface $applied_at): self
+    /** @internal Timestamp — set once */
+    public function initApplied_at(\DateTimeInterface $applied_at): self
     {
         $this->applied_at = $applied_at;
         return $this;
     }
 
-    public function setAppliedAt(\DateTimeInterface $applied_at): self
+    public function initAppliedAt(\DateTimeInterface $applied_at): self
     {
-        return $this->setApplied_at($applied_at);
+        return $this->initApplied_at($applied_at);
     }
 
     #[ORM\Column(type: 'datetime', nullable: true)]
@@ -191,15 +194,16 @@ class JobApplication
         return $this->getReviewed_at();
     }
 
-    public function setReviewed_at(?\DateTimeInterface $reviewed_at): self
+    /** @internal Timestamp — set once */
+    public function initReviewed_at(?\DateTimeInterface $reviewed_at): self
     {
         $this->reviewed_at = $reviewed_at;
         return $this;
     }
 
-    public function setReviewedAt(?\DateTimeInterface $reviewed_at): self
+    public function initReviewedAt(?\DateTimeInterface $reviewed_at): self
     {
-        return $this->setReviewed_at($reviewed_at);
+        return $this->initReviewed_at($reviewed_at);
     }
 
 }

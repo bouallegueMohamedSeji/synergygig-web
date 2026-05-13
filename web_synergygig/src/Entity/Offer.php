@@ -7,23 +7,33 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\OfferRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
+use App\Entity\Embeddable\Money;
 
 #[ORM\Entity(repositoryClass: OfferRepository::class)]
-#[ORM\Table(name: 'offers')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'offer')]
 class Offer
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: Contract::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Contract> */
+    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: Contract::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $contracts;
 
-    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: JobApplication::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, JobApplication> */
+    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: JobApplication::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $jobApplications;
 
-    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: Interview::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Interview> */
+    #[ORM\OneToMany(mappedBy: 'offer', targetEntity: Interview::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $interviews;
 
     public function __construct()
@@ -31,6 +41,7 @@ class Offer
         $this->contracts = new ArrayCollection();
         $this->jobApplications = new ArrayCollection();
         $this->interviews = new ArrayCollection();
+        $this->budget = new Money();
     }
 
     public function getId(): ?int
@@ -44,8 +55,11 @@ class Offer
         return $this;
     }
 
+    /** @return Collection<int, Contract> */
     public function getContracts(): Collection { return $this->contracts; }
+    /** @return Collection<int, JobApplication> */
     public function getJobApplications(): Collection { return $this->jobApplications; }
+    /** @return Collection<int, Interview> */
     public function getInterviews(): Collection { return $this->interviews; }
 
     #[ORM\Column(type: 'string', nullable: false)]
@@ -152,31 +166,40 @@ class Offer
         return $this;
     }
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private ?float $amount = null;
+    #[ORM\Embedded(class: Money::class, columnPrefix: 'money_')]
+    private Money $budget;
 
-    public function getAmount(): ?float
+    public function getBudget(): Money
     {
-        return $this->amount;
+        return $this->budget;
     }
 
-    public function setAmount(?float $amount): self
+    public function setBudget(Money $budget): self
     {
-        $this->amount = $amount;
+        $this->budget = $budget;
         return $this;
     }
 
-    #[ORM\Column(type: 'string', nullable: true)]
-    private ?string $currency = null;
+    public function getAmount(): ?string
+    {
+        return $this->budget->getAmount() !== 0 ? (string) ($this->budget->getAmount() / 100) : null;
+    }
+
+    public function setAmount(?string $amount): self
+    {
+        $cents = $amount !== null ? (int) round((float) $amount * 100) : 0;
+        $this->budget = new Money($cents, $this->budget->getCurrency());
+        return $this;
+    }
 
     public function getCurrency(): ?string
     {
-        return $this->currency;
+        return $this->budget->getCurrency();
     }
 
     public function setCurrency(?string $currency): self
     {
-        $this->currency = $currency;
+        $this->budget = new Money($this->budget->getAmount(), $currency ?? 'USD');
         return $this;
     }
 
@@ -257,29 +280,4 @@ class Offer
     {
         return $this->setEnd_date($end_date);
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

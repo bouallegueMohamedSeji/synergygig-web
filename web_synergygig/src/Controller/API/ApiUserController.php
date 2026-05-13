@@ -183,6 +183,7 @@ class ApiUserController extends AbstractController
 
     // ─── Serializers ───────────────────────────────────────────────────────────
 
+    /** @return array<string, mixed> */
     private function serializeUser(User $u): array
     {
         return [
@@ -198,8 +199,13 @@ class ApiUserController extends AbstractController
         ];
     }
 
-    private function serializePublicUser(User $u): array
+    /** @return array<string, mixed> */
+    /** @return array<string, mixed> */
+    private function serializePublicUser(?User $u): array
     {
+        if (!$u) {
+            return [];
+        }
         return [
             'id'         => $u->getId(),
             'firstName'  => $u->getFirstName(),

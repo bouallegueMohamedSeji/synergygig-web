@@ -36,7 +36,7 @@ class LoginListener
         $attendance->setUser($user);
         $attendance->setDate($today);
         $attendance->setCheckIn($now);
-        $attendance->setCreatedAt($now);
+        $attendance->initCreatedAt();
         $attendance->setApprovalStatus('PENDING');
 
         // Detect late (after 09:15)

@@ -6,7 +6,7 @@ use App\Entity\Project;
 
 class ProjectRiskService
 {
-    public function buildForecast(Project $project, int $windowDays = 30): array
+    public function buildForecast(Project $project, float $lat = 36.8, float $lon = 10.18, string $country = 'TN', int $windowDays = 30): array
     {
         $windowDays = max(1, min(90, $windowDays));
 

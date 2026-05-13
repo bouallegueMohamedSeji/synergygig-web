@@ -7,11 +7,17 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\DepartmentRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: DepartmentRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'departments')]
 class Department
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -58,67 +64,41 @@ class Department
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(name: 'manager_id', referencedColumnName: 'id')]
-    private ?User $manager = null;
+    private ?User $deptManager = null;
 
     public function getManager(): ?User
     {
-        return $this->manager;
+        return $this->deptManager;
     }
 
     public function setManager(?User $manager): self
     {
-        $this->manager = $manager;
+        $this->deptManager = $manager;
         return $this;
     }
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private ?float $allocated_budget = null;
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $allocated_budget = null;
 
-    public function getAllocated_budget(): ?float
+    public function getAllocated_budget(): ?string
     {
         return $this->allocated_budget;
     }
 
-    public function getAllocatedBudget(): ?float
+    public function getAllocatedBudget(): ?string
     {
         return $this->allocated_budget;
     }
 
-    public function setAllocated_budget(?float $allocated_budget): self
+    public function setAllocated_budget(?string $allocated_budget): self
     {
         $this->allocated_budget = $allocated_budget;
         return $this;
     }
 
-    public function setAllocatedBudget(?float $allocated_budget): self
+    public function setAllocatedBudget(?string $allocated_budget): self
     {
         $this->allocated_budget = $allocated_budget;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
 }

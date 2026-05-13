@@ -26,7 +26,7 @@ class NotificationService
         $n->setReferenceId($referenceId);
         $n->setReferenceType($referenceType);
         $n->setIsRead(false);
-        $n->setCreatedAt(new \DateTime());
+        $n->initCreatedAt();
 
         $this->em->persist($n);
         $this->em->flush();

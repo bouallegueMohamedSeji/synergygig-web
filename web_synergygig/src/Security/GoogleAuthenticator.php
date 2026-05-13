@@ -75,7 +75,7 @@ class GoogleAuthenticator extends OAuth2Authenticator implements AuthenticationE
                 $user->setLastName($googleUser->getLastName() ?? '');
                 $user->setGoogleId($googleId);
                 $user->setRole('EMPLOYEE');
-                $user->setCreated_at(new \DateTime());
+                $user->setCreatedAt(new \DateTime());
                 // No password for OAuth users — set a random unusable one
                 $user->setPassword(bin2hex(random_bytes(32)));
                 // Google has verified this email

@@ -7,23 +7,30 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\PostRepository;
+use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: PostRepository::class)]
-#[ORM\Table(name: 'posts')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'post')]
 class Post
 {
+    use TimestampTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Reaction::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Reaction> */
+    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Reaction::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $reactions;
 
-    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Comment::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Comment> */
+    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Comment::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $comments;
 
-    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Bookmark::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Bookmark> */
+    #[ORM\OneToMany(mappedBy: 'post', targetEntity: Bookmark::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $bookmarks;
 
     public function __construct()
@@ -44,12 +51,15 @@ class Post
         return $this;
     }
 
+    /** @return Collection<int, Reaction> */
     public function getReactions(): Collection { return $this->reactions; }
+    /** @return Collection<int, Comment> */
     public function getComments(): Collection { return $this->comments; }
+    /** @return Collection<int, Bookmark> */
     public function getBookmarks(): Collection { return $this->bookmarks; }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'author_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'author_id', referencedColumnName: 'id', nullable: false)]
     private ?User $author = null;
 
     public function getAuthor(): ?User
@@ -57,9 +67,12 @@ class Post
         return $this->author;
     }
 
-    public function setAuthor(?User $author): self
+    /** @internal Blameable field — set once at creation */
+    /** @internal */ public function initAuthor(?User $author): self
     {
-        $this->author = $author;
+        if ($this->author === null) {
+            $this->author = $author;
+        }
         return $this;
     }
 
@@ -106,7 +119,7 @@ class Post
     }
 
     #[ORM\ManyToOne(targetEntity: CommunityGroup::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(name: 'group_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'group_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?CommunityGroup $group = null;
 
     public function getGroup(): ?CommunityGroup
@@ -119,31 +132,6 @@ class Post
         $this->group = $group;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $likes_count = null;
 

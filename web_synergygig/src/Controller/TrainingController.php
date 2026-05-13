@@ -62,7 +62,7 @@ class TrainingController extends AbstractController
         $qb = $courseRepo->createQueryBuilder('c')->orderBy('c.id', 'DESC');
         $q = $request->query->get('q');
         if ($q) {
-            $qb->andWhere('LOWER(c.title) LIKE :q')->setParameter('q', '%' . mb_strtolower($q) . '%');
+            $qb->andWhere('LOWER(c.title) LIKE :q')->setParameter('q', '%' . mb_strtolower((string) $q) . '%');
         }
         $catFilter = $request->query->get('category');
         if ($catFilter) {
@@ -77,7 +77,10 @@ class TrainingController extends AbstractController
         // Build enrollment lookup for current user
         $enrollmentMap = [];
         foreach ($myEnrollments as $e) {
-            $enrollmentMap[$e->getCourse()->getId()] = $e;
+            $courseId = $e->getCourse()?->getId();
+            if ($courseId !== null) {
+                $enrollmentMap[$courseId] = $e;
+            }
         }
 
         // ── Recent enrollments for dashboard ──
@@ -93,11 +96,11 @@ class TrainingController extends AbstractController
         // ── Certificates (HR/Admin see all, others see own) ──
         $allCertificates = $myCertificates;
         if ($this->isGranted('ROLE_HR')) {
-            $allCertificates = $certRepo->findBy([], ['issued_at' => 'DESC']);
+            $allCertificates = $certRepo->findBy([], ['issued_at' => 'DESC'], 100);
         }
 
         // ── Manage tab courses (HR/Admin only) ──
-        $manageCourses = $this->isGranted('ROLE_HR') ? $courseRepo->findBy([], ['id' => 'DESC']) : [];
+        $manageCourses = $this->isGranted('ROLE_HR') ? $courseRepo->findBy([], ['id' => 'DESC'], 100) : [];
 
         return $this->render('training/index.html.twig', [
             'tab' => $tab,
@@ -130,11 +133,12 @@ class TrainingController extends AbstractController
         NotificationService $notifier,
         N8nWebhookService $n8n
     ): Response {
-        if (!$this->isCsrfTokenValid('enroll' . $course->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('enroll' . $course->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_training_index', ['tab' => 'catalog']);
         }
 
+        /** @var \App\Entity\User|null $user */
         $user = $this->getUser();
         $existing = $enrollRepo->findOneBy(['course' => $course, 'user' => $user]);
         if ($existing && $existing->getStatus() !== 'DROPPED') {
@@ -155,27 +159,29 @@ class TrainingController extends AbstractController
             $existing->setStatus('ENROLLED');
             $existing->setProgress(0);
             $existing->setScore(null);
-            $existing->setEnrolledAt(new \DateTime());
-            $existing->setCompletedAt(null);
+            $existing->initEnrolledAt(new \DateTime());
+            $existing->initCompletedAt(null);
         } else {
             $enrollment = new TrainingEnrollment();
             $enrollment->setCourse($course);
             $enrollment->setUser($user);
             $enrollment->setStatus('ENROLLED');
             $enrollment->setProgress(0);
-            $enrollment->setEnrolledAt(new \DateTime());
+            $enrollment->initEnrolledAt(new \DateTime());
             $em->persist($enrollment);
         }
 
         $em->flush();
 
         // Fire n8n webhook
-        $n8n->trainingEnrolled(
-            $user->getId(),
-            $user->getFirstName() . ' ' . $user->getLastName(),
-            $course->getId(),
-            $course->getTitle()
-        );
+        if ($user !== null) {
+            $n8n->trainingEnrolled(
+                (int) $user->getId(),
+                $user->getFirstName() . ' ' . $user->getLastName(),
+                (int) $course->getId(),
+                (string) $course->getTitle()
+            );
+        }
 
         $this->addFlash('success', 'Successfully enrolled in "' . $course->getTitle() . '"!');
         return $this->redirectToRoute('app_training_index', ['tab' => 'learning']);
@@ -188,7 +194,7 @@ class TrainingController extends AbstractController
         EntityManagerInterface $em,
         TrainingEnrollmentRepository $enrollRepo
     ): Response {
-        if (!$this->isCsrfTokenValid('drop' . $course->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('drop' . $course->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_training_index', ['tab' => 'learning']);
         }
@@ -218,7 +224,6 @@ class TrainingController extends AbstractController
                     'is_edit' => false,
                 ]);
             }
-            $course->setCreatedAt(new \DateTime());
             $em->persist($course);
             $em->flush();
             $this->addFlash('success', 'Course created.');
@@ -278,7 +283,7 @@ class TrainingController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function delete(Request $request, TrainingCourse $course, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $course->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $course->getId(), (string) $request->request->get('_token'))) {
             $em->remove($course);
             $em->flush();
             $this->addFlash('success', 'Course deleted.');
@@ -333,7 +338,7 @@ class TrainingController extends AbstractController
         NotificationService $notifier
     ): Response {
         // CSRF check
-        if (!$this->isCsrfTokenValid('quiz' . $course->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('quiz' . $course->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_training_show', ['id' => $course->getId()]);
         }
@@ -408,7 +413,7 @@ class TrainingController extends AbstractController
             if ($passed) {
                 $enrollment->setStatus('COMPLETED');
                 $enrollment->setProgress(100);
-                $enrollment->setCompletedAt(new \DateTime());
+                $enrollment->initCompletedAt(new \DateTime());
 
                 // Generate certificate if not already exists
                 $existingCert = $certRepo->findOneBy(['enrollment' => $enrollment]);
@@ -427,7 +432,7 @@ class TrainingController extends AbstractController
                     $cert->setUser($enrollment->getUser());
                     $cert->setCourse($course);
                     $cert->setCertificateNumber($certNumber);
-                    $cert->setIssuedAt(new \DateTime());
+                    $cert->initIssuedAt(new \DateTime());
                     $this->autoSignCertificate($cert);
                     $em->persist($cert);
                     $certificateGenerated = true;
@@ -439,14 +444,17 @@ class TrainingController extends AbstractController
 
             // Fire n8n webhook on training completion
             if ($passed) {
-                $n8n->trainingCompleted(
-                    $enrollment->getUser()->getId(),
-                    $enrollment->getUser()->getFirstName() . ' ' . $enrollment->getUser()->getLastName(),
-                    $course->getId(),
-                    $course->getTitle(),
-                    $scorePercent
-                );
-                $notifier->trainingCompleted($enrollment->getUser(), $course->getId(), $course->getTitle(), $scorePercent);
+                $enrollUser = $enrollment->getUser();
+                if ($enrollUser !== null) {
+                    $n8n->trainingCompleted(
+                        (int) $enrollUser->getId(),
+                        $enrollUser->getFirstName() . ' ' . $enrollUser->getLastName(),
+                        (int) $course->getId(),
+                        (string) $course->getTitle(),
+                        $scorePercent
+                    );
+                    $notifier->trainingCompleted($enrollUser, (int) $course->getId(), (string) $course->getTitle(), $scorePercent);
+                }
             }
         }
 
@@ -476,13 +484,13 @@ class TrainingController extends AbstractController
         EntityManagerInterface $em,
         AIService $ai
     ): Response {
-        if (!$this->isCsrfTokenValid('generate_ai_courses', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('generate_ai_courses', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_training_index', ['tab' => 'manage']);
         }
 
-        $topic    = trim($request->request->get('topic', ''));
-        $megaLink = trim($request->request->get('mega_link', ''));
+        $topic    = trim((string) $request->request->get('topic', ''));
+        $megaLink = trim((string) $request->request->get('mega_link', ''));
         $count    = max(1, min(10, (int) $request->request->get('count', 5)));
 
         if (empty($topic)) {
@@ -514,8 +522,8 @@ class TrainingController extends AbstractController
             return $this->redirectToRoute('app_training_index', ['tab' => 'manage']);
         }
 
-        $raw = preg_replace('/^```(?:json)?\s*/im', '', $raw);
-        $raw = preg_replace('/\s*```$/m', '', $raw);
+        $raw = (string) preg_replace('/^```(?:json)?\s*/im', '', $raw);
+        $raw = (string) preg_replace('/\s*```$/m', '', $raw);
         $raw = trim($raw);
 
         $courses = json_decode($raw, true);
@@ -540,8 +548,9 @@ class TrainingController extends AbstractController
             $course->setMegaLink($megaLink ?: (isset($cd['mega_link']) && $cd['mega_link'] ? $cd['mega_link'] : null));
             $course->setQuizTimerSeconds(isset($cd['quiz_timer_seconds']) ? (int) $cd['quiz_timer_seconds'] : 15);
             $course->setStatus('ACTIVE');
-            $course->setCreatedAt(new \DateTime());
-            $course->setCreatedBy($this->getUser());
+            /** @var \App\Entity\User|null $creator */
+            $creator = $this->getUser();
+            $course->initCreatedBy($creator);
             $em->persist($course);
             $created++;
         }
@@ -559,7 +568,7 @@ class TrainingController extends AbstractController
         Request $request,
         EntityManagerInterface $em
     ): JsonResponse {
-        if (!$this->isCsrfTokenValid('progress' . $enrollment->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('progress' . $enrollment->getId(), (string) $request->request->get('_token'))) {
             return new JsonResponse(['ok' => false, 'error' => 'Invalid CSRF token.'], 400);
         }
 
@@ -594,10 +603,10 @@ class TrainingController extends AbstractController
         $enrollments = $user ? $enrollRepo->findBy(['user' => $user], [], 10) : [];
         $allCourses  = $courseRepo->findBy(['status' => 'ACTIVE'], [], 30);
 
-        $enrolledIds = array_map(fn($e) => $e->getCourse()->getId(), $enrollments);
+        $enrolledIds = array_map(fn($e) => $e->getCourse()?->getId(), $enrollments);
 
         $enrolledSummary = implode(', ', array_map(
-            fn($e) => '"' . $e->getCourse()->getTitle() . '" (' . $e->getStatus() . ')',
+            fn($e) => '"' . ($e->getCourse()?->getTitle() ?? '') . '" (' . $e->getStatus() . ')',
             $enrollments
         )) ?: 'None yet';
 
@@ -631,8 +640,8 @@ class TrainingController extends AbstractController
             return new JsonResponse(['recommendations' => []]);
         }
 
-        $raw  = preg_replace('/^```(?:json)?\s*/im', '', $raw);
-        $raw  = preg_replace('/\s*```$/m', '', $raw);
+        $raw  = (string) preg_replace('/^```(?:json)?\s*/im', '', $raw);
+        $raw  = (string) preg_replace('/\s*```$/m', '', $raw);
         $raw  = trim($raw);
         $data = json_decode($raw, true);
         $recs = $data['recommendations'] ?? [];
@@ -640,7 +649,7 @@ class TrainingController extends AbstractController
         // Attach course IDs for linking
         $titleMap = [];
         foreach ($available as $c) {
-            $titleMap[strtolower(trim($c->getTitle()))] = $c->getId();
+            $titleMap[strtolower(trim((string) $c->getTitle()))] = $c->getId();
         }
         foreach ($recs as &$r) {
             $r['course_id'] = $titleMap[strtolower(trim($r['title'] ?? ''))] ?? null;
@@ -758,6 +767,7 @@ class TrainingController extends AbstractController
      * Shared AI quiz generator — mirrors Java ZAIService::generateCourseQuiz().
      * Returns ['questions' => [...], 'correctAnswers' => [...], 'timer' => int]
      * or null on failure.
+     * @return array{questions: array<int, array<string, mixed>>, correctAnswers: array<int, int>, timer: int}|null
      */
     private function generateCourseQuizData(TrainingCourse $course, AIService $ai): ?array
     {
@@ -832,7 +842,10 @@ SYSTEM;
         return ['questions' => $questions, 'correctAnswers' => $correctAnswers, 'timer' => $timer];
     }
 
-    /** Course-specific fallback quiz — used when AI is unavailable. Never uses external APIs. */
+    /**
+     * Course-specific fallback quiz — used when AI is unavailable. Never uses external APIs.
+     * @return array{array<int, array<string, mixed>>, array<int, int>}
+     */
     private function fallbackQuizQuestions(TrainingCourse $course): array
     {
         $title    = $course->getTitle();
@@ -915,7 +928,7 @@ SYSTEM;
             $options     = $q['options'];
             $correctText = $options[$q['answer']];
             shuffle($options);
-            $newCorrect = array_search($correctText, $options, true);
+            $newCorrect = (int) array_search($correctText, $options, true);
 
             $questions[]        = ['index' => $i, 'q' => $q['q'], 'options' => $options, 'answer' => $newCorrect];
             $correctAnswers[$i] = $newCorrect;
@@ -930,7 +943,7 @@ SYSTEM;
             return;
         }
 
-        $certificate->setSignedAt(new \DateTime());
+        $certificate->initSignedAt(new \DateTime());
         if ($certificate->getUser()) {
             $certificate->setSignedByUserId($certificate->getUser()->getId());
         }
@@ -1020,15 +1033,15 @@ SYSTEM;
         Request $request,
         EntityManagerInterface $em
     ): Response {
-        if (!$this->isCsrfTokenValid('certsign' . $certificate->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('certsign' . $certificate->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
-            return $this->redirectToRoute('app_training_show', ['id' => $certificate->getCourse()->getId()]);
+            return $this->redirectToRoute('app_training_show', ['id' => (int) $certificate->getCourse()?->getId()]);
         }
 
         $errors = [];
 
         // Validate signature data (must be data:image/png;base64,...)
-        $signatureData = $request->request->get('signature_data', '');
+        $signatureData = (string) $request->request->get('signature_data', '');
         if (empty($signatureData)) {
             $errors[] = 'Signature is required.';
         } elseif (!preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $signatureData)) {
@@ -1041,11 +1054,11 @@ SYSTEM;
             foreach ($errors as $e) {
                 $this->addFlash('danger', $e);
             }
-            return $this->redirectToRoute('app_training_show', ['id' => $certificate->getCourse()->getId()]);
+            return $this->redirectToRoute('app_training_show', ['id' => (int) $certificate->getCourse()?->getId()]);
         }
 
         $certificate->setSignatureData($signatureData);
-        $certificate->setSignedAt(new \DateTime());
+        $certificate->initSignedAt(new \DateTime());
         if ($certificate->getUser()) {
             $certificate->setSignedByUserId($certificate->getUser()->getId());
         }
@@ -1053,6 +1066,6 @@ SYSTEM;
         $em->flush();
         $this->addFlash('success', 'Certificate signed successfully!');
 
-        return $this->redirectToRoute('app_training_show', ['id' => $certificate->getCourse()->getId()]);
+        return $this->redirectToRoute('app_training_show', ['id' => (int) $certificate->getCourse()?->getId()]);
     }
 }

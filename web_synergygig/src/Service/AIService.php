@@ -215,7 +215,7 @@ class AIService
         $result = $this->chat($system, $text, 0.3, 2048);
         if ($result) {
             // Strip markdown fences if present
-            $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+            $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result)) ?? trim($result);
             $parsed = json_decode($result, true);
             if (is_array($parsed)) {
                 return $parsed;
@@ -232,7 +232,7 @@ class AIService
                 . "Return JSON: {\"type\":\"question\",\"message\":\"<markdown>\",\"question\":1}";
             $result = $this->chat($system, "Begin the mock interview.", 0.8, 512);
             if ($result) {
-                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result)) ?? trim($result);
                 $parsed = json_decode($result, true);
                 if (is_array($parsed)) {
                     return $parsed;
@@ -245,7 +245,7 @@ class AIService
                 . "where the candidate completed {$qNum}/8 questions. Return JSON: {\"type\":\"summary\",\"message\":\"<markdown>\"}";
             $result = $this->chat($system, "Summarize the interview performance.", 0.7, 1024);
             if ($result) {
-                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result)) ?? trim($result);
                 $parsed = json_decode($result, true);
                 if (is_array($parsed)) {
                     return $parsed;
@@ -265,7 +265,7 @@ class AIService
 
             $result = $this->chat($system, $user, 0.7, 1024);
             if ($result) {
-                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+                $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result)) ?? trim($result);
                 $parsed = json_decode($result, true);
                 if (is_array($parsed)) {
                     return $parsed;
@@ -390,7 +390,7 @@ class AIService
 
         $result = $this->chat($system, $user, 0.7, 2048);
         if ($result) {
-            $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result));
+            $result = preg_replace('/^```(?:json)?\s*|```\s*$/m', '', trim($result)) ?? trim($result);
             $parsed = json_decode($result, true);
             if (is_array($parsed) && !empty($parsed)) {
                 return $parsed;
@@ -591,7 +591,7 @@ TXT;
     {
         preg_match('/[\w.+-]+@[\w-]+\.[\w.]+/', $text, $email);
         preg_match('/[\+]?[\d\s\-\(\)]{7,15}/', $text, $phone);
-        $firstLine = trim(strtok($text, "\n"));
+        $firstLine = trim(strtok($text, "\n") ?: '');
         $skills = [];
         foreach (['PHP','Java','Python','JavaScript','React','Angular','Vue','Node.js','SQL','Docker','AWS','Git','Symfony','Laravel','Spring'] as $kw) {
             if (stripos($text, $kw) !== false) $skills[] = $kw;

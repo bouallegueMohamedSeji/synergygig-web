@@ -1,5 +1,5 @@
 parameters:
-    level: 5
+    level: 8
     paths:
         - src
     excludePaths:
@@ -7,3 +7,5 @@ parameters:
     ignoreErrors:
         # Suppress Symfony magic that PHPStan can't infer
         - '#Call to an undefined method Symfony\\Component\\Security\\Core\\User\\UserInterface::#'
+        -
+            identifier: missingType.iterableValue

@@ -26,7 +26,7 @@ class JobApplicationController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function hrOffers(Request $request, OfferRepository $repo, JobApplicationRepository $appRepo): Response
     {
-        $tab = $request->query->get('tab', 'pending');
+        $tab = trim((string) $request->query->get('tab', 'pending'));
 
         if ($tab === 'published') {
             $offers = $repo->createQueryBuilder('o')
@@ -82,7 +82,7 @@ class JobApplicationController extends AbstractController
             return $this->redirectToRoute('app_hr_offers');
         }
 
-        if ($this->isCsrfTokenValid('publish' . $offer->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('publish' . $offer->getId(), (string) $request->request->get('_token'))) {
             $offer->setStatus('OPEN');
             $em->flush();
             $this->addFlash('success', 'Offer "' . $offer->getTitle() . '" published to marketplace.');
@@ -103,7 +103,7 @@ class JobApplicationController extends AbstractController
             return $this->redirectToRoute('app_hr_offers');
         }
 
-        if ($this->isCsrfTokenValid('decline' . $offer->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('decline' . $offer->getId(), (string) $request->request->get('_token'))) {
             $offer->setStatus('CANCELLED');
             $em->flush();
             $this->addFlash('success', 'Offer "' . $offer->getTitle() . '" declined.');
@@ -141,7 +141,7 @@ class JobApplicationController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function deleteOffer(Offer $offer, Request $request, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $offer->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $offer->getId(), (string) $request->request->get('_token'))) {
             $title = $offer->getTitle();
             $em->remove($offer);
             $em->flush();
@@ -175,8 +175,8 @@ class JobApplicationController extends AbstractController
             $qb->andWhere('o.id = :oid')->setParameter('oid', $offerId);
         }
 
-        $q = $request->query->get('q');
-        if ($q) {
+        $q = trim((string) $request->query->get('q', ''));
+        if ($q !== '') {
             $qb->andWhere('LOWER(o.title) LIKE :q OR LOWER(u.first_name) LIKE :q OR LOWER(u.last_name) LIKE :q')
                ->setParameter('q', '%' . mb_strtolower($q) . '%');
         }
@@ -215,9 +215,9 @@ class JobApplicationController extends AbstractController
             return $this->redirectToRoute('app_application_index');
         }
 
-        if ($this->isCsrfTokenValid('accept' . $application->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('accept' . $application->getId(), (string) $request->request->get('_token'))) {
             $application->setStatus('ACCEPTED');
-            $application->setReviewedAt(new \DateTime());
+            $application->initReviewedAt(new \DateTime());
             $em->flush();
 
             $this->addFlash('success', 'Application accepted. Please schedule the interview.');
@@ -239,9 +239,9 @@ class JobApplicationController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function reject(JobApplication $application, Request $request, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('reject' . $application->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('reject' . $application->getId(), (string) $request->request->get('_token'))) {
             $application->setStatus('REJECTED');
-            $application->setReviewedAt(new \DateTime());
+            $application->initReviewedAt(new \DateTime());
             $em->flush();
             $this->addFlash('success', 'Application rejected.');
         }

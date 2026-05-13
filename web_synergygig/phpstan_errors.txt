@@ -1,0 +1,1 @@
+Note: Using configuration file C:\Users\seji\Desktop\java\SynergyGig\web_synergygig\phpstan.neon.

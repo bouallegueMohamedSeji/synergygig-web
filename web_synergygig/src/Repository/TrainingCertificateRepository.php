@@ -6,6 +6,9 @@ use App\Entity\TrainingCertificate;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<TrainingCertificate>
+ */
 class TrainingCertificateRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

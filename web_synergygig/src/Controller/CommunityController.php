@@ -45,6 +45,7 @@ class CommunityController extends AbstractController
     ];
 
     // ── Sidebar helper ──
+    /** @return array<string, mixed> */
     private function sidebarData(CommunityGroupRepository $groupRepo, EntityManagerInterface $em): array
     {
         $user = $this->getUser();
@@ -64,7 +65,11 @@ class CommunityController extends AbstractController
     }
 
     // ── Reactions helper ──
-    private function getPostReactions(EntityManagerInterface $em, $posts): array
+    /**
+     * @param array<mixed> $posts
+     * @return array<int|string, array{counts: array<string, int>, userReaction: string|null, total: int}>
+     */
+    private function getPostReactions(EntityManagerInterface $em, array $posts): array
     {
         $map = [];
         $user = $this->getUser();
@@ -102,7 +107,7 @@ class CommunityController extends AbstractController
     #[Route('/', name: 'app_community_index')]
     public function index(PostRepository $postRepo, CommunityGroupRepository $groupRepo, EntityManagerInterface $em): Response
     {
-        $posts = $postRepo->findBy([], ['created_at' => 'DESC']);
+        $posts = $postRepo->findBy([], ['created_at' => 'DESC'], 100);
         $user = $this->getUser();
         $bookmarkedIds = [];
         if ($user) {
@@ -125,7 +130,7 @@ class CommunityController extends AbstractController
     #[Route('/discover', name: 'app_community_discover')]
     public function discover(PostRepository $postRepo, CommunityGroupRepository $groupRepo, EntityManagerInterface $em): Response
     {
-        $posts = $postRepo->findBy([], ['created_at' => 'DESC']);
+        $posts = $postRepo->findBy([], ['created_at' => 'DESC'], 100);
         $user = $this->getUser();
         $bookmarkedIds = [];
         if ($user) {
@@ -179,12 +184,12 @@ class CommunityController extends AbstractController
     #[Route('/new', name: 'app_community_new', methods: ['POST'])]
     public function newPost(Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('new_post', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('new_post', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_community_index');
         }
 
-        $content = trim($request->request->get('content', ''));
+        $content = trim((string) $request->request->get('content', ''));
         $file = $request->files->get('media');
 
         if ($content === '' && (!$file || !$file->isValid())) {
@@ -214,11 +219,12 @@ class CommunityController extends AbstractController
         $post = new Post();
         $post->setContent($content);
         $post->setVisibility($visibility);
-        $post->setCreatedAt(new \DateTime());
         $post->setLikesCount(0);
         $post->setCommentsCount(0);
         $post->setSharesCount(0);
-        $post->setAuthor($this->getUser());
+        /** @var \App\Entity\User|null $postAuthor */
+        $postAuthor = $this->getUser();
+        $post->initAuthor($postAuthor);
 
         // Handle image/file upload (stored as base64)
         if ($file && $file->isValid()) {
@@ -231,7 +237,8 @@ class CommunityController extends AbstractController
                 $this->addFlash('error', 'Media file is too large. Maximum size is 10MB.');
                 return $this->redirectToRoute('app_community_index');
             }
-            $data = base64_encode(file_get_contents($file->getPathname()));
+            $rawData = file_get_contents($file->getPathname());
+            $data = base64_encode($rawData !== false ? $rawData : '');
             $post->setImage_base64('data:' . $file->getMimeType() . ';base64,' . $data);
         }
 
@@ -249,7 +256,7 @@ class CommunityController extends AbstractController
         $this->addFlash('success', 'Post published!');
 
         $redirect = $request->request->get('redirect');
-        if ($redirect) return $this->redirect($redirect);
+        if ($redirect) return $this->redirect((string) $redirect);
         return $this->redirectToRoute('app_community_index');
     }
 
@@ -259,8 +266,8 @@ class CommunityController extends AbstractController
         if ($post->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
             throw $this->createAccessDeniedException('You can only edit your own posts.');
         }
-        $content = trim($request->request->get('content', ''));
-        if ($content !== '' && $this->isCsrfTokenValid('edit-post-' . $post->getId(), $request->request->get('_token'))) {
+        $content = trim((string) $request->request->get('content', ''));
+        if ($content !== '' && $this->isCsrfTokenValid('edit-post-' . $post->getId(), (string) $request->request->get('_token'))) {
             // Content moderation
             $check = BadWordsService::check($content);
             if ($check['hasBadWords']) {
@@ -277,7 +284,8 @@ class CommunityController extends AbstractController
             if ($file && $file->isValid()) {
                 $allowed = ['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/webm'];
                 if (in_array($file->getMimeType(), $allowed) && $file->getSize() <= 10 * 1024 * 1024) {
-                    $data = base64_encode(file_get_contents($file->getPathname()));
+                    $rawData2 = file_get_contents($file->getPathname());
+                    $data = base64_encode($rawData2 !== false ? $rawData2 : '');
                     $post->setImage_base64('data:' . $file->getMimeType() . ';base64,' . $data);
                 }
             }
@@ -342,7 +350,7 @@ class CommunityController extends AbstractController
     #[Route('/ai-improve', name: 'app_community_ai_improve', methods: ['POST'])]
     public function aiImprove(Request $request): Response
     {
-        $text = trim($request->request->get('content', ''));
+        $text = trim((string) $request->request->get('content', ''));
         $action = $request->request->get('ai_action', 'improve');
 
         if ($text === '') {
@@ -371,9 +379,9 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
 
             $aiResult = $this->callGroqApi($systemPrompt, $text);
             if ($aiResult) {
-                $aiResult = preg_replace('/^```(?:json)?\s*/', '', $aiResult);
-                $aiResult = preg_replace('/\s*```$/', '', $aiResult);
-                $parsed = json_decode($aiResult, true);
+                $aiResult = (string) preg_replace('/^```(?:json)?\s*/', '', $aiResult);
+                $aiResult = (string) preg_replace('/\s*```$/', '', $aiResult);
+                $parsed = json_decode((string) $aiResult, true);
                 if ($parsed && isset($parsed['tones'])) {
                     $tones = implode(', ', $parsed['tones']);
                     $sentiment = $parsed['sentiment'] ?? 'neutral';
@@ -411,7 +419,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
             $result = $text;
             $result = preg_replace_callback('/(^|[.!?]\s+)([a-z])/', fn($m) => $m[1] . strtoupper($m[2]), $result);
             $fixes = ['/\bdont\b/i'=>"don't",'/\bcant\b/i'=>"can't",'/\bim\b/i'=>"I'm",'/\bteh\b/i'=>'the'];
-            foreach ($fixes as $p => $r) { $result = preg_replace($p, $r, $result); }
+            foreach ($fixes as $p => $r) { $result = (string) preg_replace($p, $r, (string) $result); }
             if ($result !== '' && !preg_match('/[.!?]$/', $result)) $result .= '.';
         }
         $this->addFlash('success', '✨ AI improved your text!');
@@ -427,6 +435,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         $topLevel = [];
         $replies = [];
         foreach ($allComments as $c) {
+            /** @var \App\Entity\Comment $c */
             if ($c->getParent()) {
                 $pid = $c->getParent()->getId();
                 $replies[$pid][] = $c;
@@ -462,7 +471,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         if ($post->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
             throw $this->createAccessDeniedException('You can only delete your own posts.');
         }
-        if ($this->isCsrfTokenValid('delete-post-' . $post->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete-post-' . $post->getId(), (string) $request->request->get('_token'))) {
             $em->remove($post);
             $em->flush();
             $this->addFlash('success', 'Post deleted.');
@@ -491,14 +500,15 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
                 $post->setLikesCount(max(0, ($post->getLikesCount() ?? 1) - 1));
             } else {
                 // Switch to different reaction
-                $existing->setType($type);
+                $existing->setType((string) $type);
             }
         } else {
             $reaction = new Reaction();
+            /** @var \App\Entity\User|null $reactUser */
+            $reactUser = $user;
             $reaction->setPost($post);
-            $reaction->setUser($user);
-            $reaction->setType($type);
-            $reaction->setCreated_at(new \DateTime());
+            $reaction->setUser($reactUser);
+            $reaction->setType((string) $type);
             $em->persist($reaction);
             $post->setLikesCount(($post->getLikesCount() ?? 0) + 1);
         }
@@ -514,7 +524,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     {
         $post->setSharesCount(($post->getSharesCount() ?? 0) + 1);
         $em->flush();
-        return new JsonResponse(['shares' => $post->getSharesCount()]);
+        return new \Symfony\Component\HttpFoundation\JsonResponse(['shares' => $post->getSharesCount()]);
     }
 
     // ═══════════════════════════
@@ -533,10 +543,11 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
             $em->flush();
             $this->addFlash('success', 'Bookmark removed.');
         } else {
+            /** @var \App\Entity\User $bookmarkUser */
+            $bookmarkUser = $user;
             $bookmark = new Bookmark();
-            $bookmark->setUser($user);
+            $bookmark->setUser($bookmarkUser);
             $bookmark->setPost($post);
-            $bookmark->setCreatedAt(new \DateTime());
             $em->persist($bookmark);
             $em->flush();
             $this->addFlash('success', 'Post saved!');
@@ -555,7 +566,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/post/{id}/comment', name: 'app_community_comment', methods: ['POST'])]
     public function addComment(Request $request, Post $post, EntityManagerInterface $em, CommentRepository $commentRepo): Response
     {
-        $content = trim($request->request->get('content', ''));
+        $content = trim((string) $request->request->get('content', ''));
         if ($content !== '') {
             // Content moderation
             $check = BadWordsService::check($content);
@@ -565,16 +576,16 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
             }
 
             $comment = new Comment();
+            /** @var \App\Entity\User|null $commentAuthor */
+            $commentAuthor = $this->getUser();
             $comment->setPost($post);
-            $comment->setAuthor($this->getUser());
+            $comment->initAuthor($commentAuthor);
             $comment->setContent($content);
-            $comment->setCreatedAt(new \DateTime());
-
             // Threading: parent comment
             $parentId = $request->request->get('parent_id');
             if ($parentId) {
                 $parent = $commentRepo->find($parentId);
-                if ($parent) $comment->setParent($parent);
+                if ($parent instanceof Comment) $comment->setParent($parent);
             }
 
             $post->setCommentsCount(($post->getCommentsCount() ?? 0) + 1);
@@ -591,12 +602,16 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         if ($comment && $comment->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
             throw $this->createAccessDeniedException('You can only delete your own comments.');
         }
-        if ($comment && $this->isCsrfTokenValid('delete-comment-' . $id, $request->request->get('_token'))) {
-            $post = $comment->getPost();
-            $post->setCommentsCount(max(0, ($post->getCommentsCount() ?? 1) - 1));
-            $em->remove($comment);
+        if ($comment && $this->isCsrfTokenValid('delete-comment-' . $id, (string) $request->request->get('_token'))) {
+            /** @var \App\Entity\Comment $typedComment */
+            $typedComment = $comment;
+            $delPost = $typedComment->getPost();
+            if ($delPost !== null) {
+                $delPost->setCommentsCount(max(0, ($delPost->getCommentsCount() ?? 1) - 1));
+            }
+            $em->remove($typedComment);
             $em->flush();
-            return $this->redirectToRoute('app_community_show', ['id' => $post->getId()]);
+            return $this->redirectToRoute('app_community_show', ['id' => $delPost?->getId()]);
         }
         return $this->redirectToRoute('app_community_index');
     }
@@ -611,20 +626,22 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         if ($comment->getAuthor() !== $this->getUser() && !$this->isGranted('ROLE_ADMIN')) {
             throw $this->createAccessDeniedException('You can only edit your own comments.');
         }
-        if ($this->isCsrfTokenValid('edit-comment-' . $id, $request->request->get('_token'))) {
-            $content = trim($request->request->get('content', ''));
+        /** @var \App\Entity\Comment $typedComment2 */
+        $typedComment2 = $comment;
+        if ($this->isCsrfTokenValid('edit-comment-' . $id, (string) $request->request->get('_token'))) {
+            $content = trim((string) $request->request->get('content', ''));
             if ($content !== '') {
                 $check = BadWordsService::check($content);
                 if ($check['hasBadWords']) {
                     $this->addFlash('error', 'Your comment contains inappropriate language. Please review.');
-                    return $this->redirectToRoute('app_community_show', ['id' => $comment->getPost()->getId()]);
+                    return $this->redirectToRoute('app_community_show', ['id' => (int) $typedComment2->getPost()?->getId()]);
                 }
-                $comment->setContent($content);
+                $typedComment2->setContent($content);
                 $em->flush();
                 $this->addFlash('success', 'Comment updated.');
             }
         }
-        return $this->redirectToRoute('app_community_show', ['id' => $comment->getPost()->getId()]);
+        return $this->redirectToRoute('app_community_show', ['id' => (int) $typedComment2->getPost()?->getId()]);
     }
 
     // ═══════════════════════════
@@ -634,12 +651,12 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/people', name: 'app_community_people')]
     public function people(Request $request, UserRepository $userRepo, EntityManagerInterface $em, CommunityGroupRepository $groupRepo): Response
     {
-        $q = trim($request->query->get('q', ''));
+        $q = trim((string) $request->query->get('q', ''));
         if ($q !== '') {
             $users = $em->createQuery("SELECT u FROM App\\Entity\\User u WHERE LOWER(u.firstName) LIKE :q OR LOWER(u.lastName) LIKE :q ORDER BY u.id ASC")
                 ->setParameter('q', '%' . strtolower($q) . '%')->getResult();
         } else {
-            $users = $userRepo->findBy([], ['id' => 'ASC']);
+            $users = $userRepo->findBy([], ['id' => 'ASC'], 100);
         }
         $me = $this->getUser();
 
@@ -694,11 +711,12 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
 
         $existing = $em->getRepository(UserFollow::class)->findOneBy(['follower' => $me, 'followed' => $target]);
         if (!$existing) {
+            /** @var \App\Entity\User $meUser */
+            $meUser = $me;
             $follow = new UserFollow();
-            $follow->setFollower($me);
+            $follow->setFollower($meUser);
             $follow->setFollowed($target);
             $follow->setStatus('friend_pending');
-            $follow->setCreated_at(new \DateTime());
             $em->persist($follow);
             $em->flush();
             $this->addFlash('success', 'Friend request sent!');
@@ -719,10 +737,11 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
             // Create reverse follow too
             $reverse = $em->getRepository(UserFollow::class)->findOneBy(['follower' => $me, 'followed' => $sender]);
             if (!$reverse) {
+                /** @var \App\Entity\User $meAccept */
+                $meAccept = $me;
                 $reverse = new UserFollow();
-                $reverse->setFollower($me);
+                $reverse->setFollower($meAccept);
                 $reverse->setFollowed($sender);
-                $reverse->setCreated_at(new \DateTime());
                 $em->persist($reverse);
             }
             $reverse->setStatus('friend_accepted');
@@ -764,11 +783,12 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
                 $em->flush();
             }
         } else {
+            /** @var \App\Entity\User $meFollow */
+            $meFollow = $me;
             $follow = new UserFollow();
-            $follow->setFollower($me);
+            $follow->setFollower($meFollow);
             $follow->setFollowed($target);
             $follow->setStatus('following');
-            $follow->setCreated_at(new \DateTime());
             $em->persist($follow);
             $em->flush();
         }
@@ -782,7 +802,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/groups', name: 'app_community_groups')]
     public function groups(CommunityGroupRepository $groupRepo, EntityManagerInterface $em): Response
     {
-        $groups = $groupRepo->findBy([], ['created_at' => 'DESC']);
+        $groups = $groupRepo->findBy([], ['created_at' => 'DESC'], 100);
         $me = $this->getUser();
         $membership = [];
         if ($me) {
@@ -802,23 +822,24 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/groups/create', name: 'app_community_create_group', methods: ['POST'])]
     public function createGroup(Request $request, EntityManagerInterface $em): Response
     {
-        $name = trim($request->request->get('name', ''));
+        $name = trim((string) $request->request->get('name', ''));
         if ($name !== '') {
             $group = new CommunityGroup();
+            /** @var \App\Entity\User|null $groupCreator */
+            $groupCreator = $this->getUser();
             $group->setName($name);
-            $group->setDescription(trim($request->request->get('description', '')));
-            $group->setPrivacy($request->request->get('privacy', 'PUBLIC'));
-            $group->setCreator($this->getUser());
+            $group->setDescription(trim((string) $request->request->get('description', '')));
+            $group->setPrivacy((string) $request->request->get('privacy', 'PUBLIC'));
+            $group->initCreator($groupCreator);
             $group->setMember_count(1);
-            $group->setCreated_at(new \DateTime());
             $em->persist($group);
 
             // Add creator as ADMIN member
             $member = new GroupMember();
             $member->setGroup($group);
-            $member->setUser($this->getUser());
+            $member->setUser($groupCreator);
             $member->setRole('ADMIN');
-            $member->setJoined_at(new \DateTime());
+            $member->initJoined_at(new \DateTime());
             $em->persist($member);
 
             $em->flush();
@@ -862,14 +883,16 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     public function joinGroup(CommunityGroup $group, EntityManagerInterface $em): Response
     {
         $me = $this->getUser();
-        if ($me) {
-            $existing = $em->getRepository(GroupMember::class)->findOneBy(['group' => $group, 'user' => $me]);
+        /** @var \App\Entity\User|null $meJoin2 */
+        $meJoin2 = $me;
+        if ($meJoin2) {
+            $existing = $em->getRepository(GroupMember::class)->findOneBy(['group' => $group, 'user' => $meJoin2]);
             if (!$existing) {
                 $member = new GroupMember();
                 $member->setGroup($group);
-                $member->setUser($me);
+                $member->setUser($meJoin2);
                 $member->setRole('MEMBER');
-                $member->setJoined_at(new \DateTime());
+                $member->initJoined_at(new \DateTime());
                 $em->persist($member);
                 $group->setMember_count(($group->getMember_count() ?? 0) + 1);
                 $em->flush();
@@ -883,8 +906,10 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     public function leaveGroup(CommunityGroup $group, EntityManagerInterface $em): Response
     {
         $me = $this->getUser();
-        if ($me) {
-            $member = $em->getRepository(GroupMember::class)->findOneBy(['group' => $group, 'user' => $me]);
+        /** @var \App\Entity\User|null $meLeave */
+        $meLeave = $me;
+        if ($meLeave) {
+            $member = $em->getRepository(GroupMember::class)->findOneBy(['group' => $group, 'user' => $meLeave]);
             if ($member && ($member->getRole() ?? 'MEMBER') !== 'ADMIN') {
                 $em->remove($member);
                 $group->setMember_count(max(0, ($group->getMember_count() ?? 1) - 1));
@@ -910,7 +935,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
     #[Route('/wiki', name: 'app_community_wiki')]
     public function wiki(Request $request, CommunityGroupRepository $groupRepo, EntityManagerInterface $em): Response
     {
-        $query = trim($request->query->get('q', ''));
+        $query = trim((string) $request->query->get('q', ''));
         $article = null;
         if ($query !== '') {
             $article = $this->fetchWikipediaArticle($query);
@@ -923,6 +948,7 @@ CRITICAL: Set "harmful" to true if the text contains hate speech, threats, self-
         ], $this->sidebarData($groupRepo, $em)));
     }
 
+    /** @return array<string, mixed>|null */
     private function fetchWikipediaArticle(string $query): ?array
     {
         $url = 'https://en.wikipedia.org/w/api.php?' . http_build_query([

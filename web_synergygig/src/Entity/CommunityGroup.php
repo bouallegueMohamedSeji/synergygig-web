@@ -7,20 +7,26 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\CommunityGroupRepository;
+use App\Entity\Trait\TimestampTrait;
 
 #[ORM\Entity(repositoryClass: CommunityGroupRepository::class)]
-#[ORM\Table(name: 'community_groups')]
+#[ORM\HasLifecycleCallbacks]
+#[ORM\Table(name: 'community_group')]
 class CommunityGroup
 {
+    use TimestampTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
-    #[ORM\OneToMany(mappedBy: 'group', targetEntity: Post::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, Post> */
+    #[ORM\OneToMany(mappedBy: 'group', targetEntity: Post::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $posts;
 
-    #[ORM\OneToMany(mappedBy: 'group', targetEntity: GroupMember::class, cascade: ['remove'], orphanRemoval: true)]
+    /** @var Collection<int, GroupMember> */
+    #[ORM\OneToMany(mappedBy: 'group', targetEntity: GroupMember::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $groupMembers;
 
     public function __construct()
@@ -40,7 +46,9 @@ class CommunityGroup
         return $this;
     }
 
+    /** @return Collection<int, Post> */
     public function getPosts(): Collection { return $this->posts; }
+    /** @return Collection<int, GroupMember> */
     public function getGroupMembers(): Collection { return $this->groupMembers; }
 
     #[ORM\Column(type: 'string', nullable: false)]
@@ -86,7 +94,7 @@ class CommunityGroup
     }
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'creator_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'creator_id', referencedColumnName: 'id', nullable: false)]
     private ?User $creator = null;
 
     public function getCreator(): ?User
@@ -94,9 +102,12 @@ class CommunityGroup
         return $this->creator;
     }
 
-    public function setCreator(?User $creator): self
+    /** @internal Blameable field — set once at creation */
+    /** @internal */ public function initCreator(?User $creator): self
     {
-        $this->creator = $creator;
+        if ($this->creator === null) {
+            $this->creator = $creator;
+        }
         return $this;
     }
 
@@ -137,29 +148,4 @@ class CommunityGroup
     {
         return $this->setMember_count($member_count);
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

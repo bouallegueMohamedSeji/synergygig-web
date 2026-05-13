@@ -7,11 +7,17 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 use App\Repository\InterviewRepository;
+use App\Entity\Trait\TimestampTrait;
+use App\Entity\Trait\BlameableTrait;
 
 #[ORM\Entity(repositoryClass: InterviewRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'interviews')]
 class Interview
 {
+    use TimestampTrait;
+    use BlameableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -71,13 +77,14 @@ class Interview
         return $this->getDate_time();
     }
 
-    public function setDate_time(\DateTimeInterface $date_time): self
+    /** @internal Timestamp — use initDate_time */
+    public function initDate_time(\DateTimeInterface $date_time): self
     {
         $this->date_time = $date_time;
         return $this;
     }
 
-    public function setDateTime(?\DateTimeInterface $date_time): self
+    public function initDateTime(?\DateTimeInterface $date_time): self
     {
         if ($date_time !== null) {
             $this->date_time = $date_time;
@@ -124,7 +131,7 @@ class Interview
     }
 
     #[ORM\ManyToOne(targetEntity: JobApplication::class, inversedBy: 'interviews')]
-    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'application_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?JobApplication $application = null;
 
     public function getApplication(): ?JobApplication
@@ -139,7 +146,7 @@ class Interview
     }
 
     #[ORM\ManyToOne(targetEntity: Offer::class, inversedBy: 'interviews')]
-    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'offer_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Offer $offer = null;
 
     public function getOffer(): ?Offer
@@ -152,29 +159,4 @@ class Interview
         $this->offer = $offer;
         return $this;
     }
-
-    #[ORM\Column(type: 'datetime', nullable: false)]
-    private ?\DateTimeInterface $created_at = null;
-
-    public function getCreated_at(): ?\DateTimeInterface
-    {
-        return $this->created_at;
-    }
-
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->getCreated_at();
-    }
-
-    public function setCreated_at(\DateTimeInterface $created_at): self
-    {
-        $this->created_at = $created_at;
-        return $this;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $created_at): self
-    {
-        return $this->setCreated_at($created_at);
-    }
-
 }

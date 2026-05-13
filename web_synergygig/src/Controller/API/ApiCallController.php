@@ -19,6 +19,7 @@ use Symfony\Component\Routing\Annotation\Route;
 #[Route('/api/calls')]
 class ApiCallController extends AbstractController
 {
+    /** @return array<string, mixed> */
     private function callToArray(Call $c): array
     {
         return [
@@ -97,10 +98,10 @@ class ApiCallController extends AbstractController
         }
 
         // End any existing active call for the caller
-        $active = $callRepo->findActiveCallById($caller->getId());
+        $active = $callRepo->findActiveCallById((int) $caller->getId());
         if ($active) {
             $active->setStatus('ENDED');
-            $active->setEndedAt(new \DateTime());
+            $active->initEndedAt(new \DateTime());
         }
 
         $call = new Call();
@@ -109,7 +110,7 @@ class ApiCallController extends AbstractController
         $call->setRoomId(isset($data['room_id']) ? (int) $data['room_id'] : null);
         $call->setCallType(strtoupper($data['call_type'] ?? 'AUDIO'));
         $call->setStatus('RINGING');
-        $call->setCreatedAt(new \DateTime());
+        $call->initCreatedAt();
 
         $em->persist($call);
         $em->flush();
@@ -127,7 +128,7 @@ class ApiCallController extends AbstractController
         if (!$call) return $this->json(['error' => 'Not found'], 404);
 
         $call->setStatus('CONNECTED');
-        $call->setStartedAt(new \DateTime());
+        $call->initStartedAt(new \DateTime());
         $em->flush();
 
         return $this->json($this->callToArray($call));
@@ -143,7 +144,7 @@ class ApiCallController extends AbstractController
         if (!$call) return $this->json(['error' => 'Not found'], 404);
 
         $call->setStatus('REJECTED');
-        $call->setEndedAt(new \DateTime());
+        $call->initEndedAt(new \DateTime());
         $em->flush();
 
         return $this->json($this->callToArray($call));
@@ -159,7 +160,7 @@ class ApiCallController extends AbstractController
         if (!$call) return $this->json(['error' => 'Not found'], 404);
 
         $call->setStatus('ENDED');
-        $call->setEndedAt(new \DateTime());
+        $call->initEndedAt(new \DateTime());
         $em->flush();
 
         return $this->json($this->callToArray($call));

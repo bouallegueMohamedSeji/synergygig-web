@@ -12,6 +12,9 @@
         <testsuite name="Functional">
             <directory>tests/Functional</directory>
         </testsuite>
+        <testsuite name="Service">
+            <directory>tests/Service</directory>
+        </testsuite>
     </testsuites>
 
     <source>

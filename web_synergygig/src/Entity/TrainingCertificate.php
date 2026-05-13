@@ -29,7 +29,7 @@ class TrainingCertificate
     }
 
     #[ORM\ManyToOne(targetEntity: TrainingEnrollment::class, inversedBy: 'certificates')]
-    #[ORM\JoinColumn(name: 'enrollment_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'enrollment_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?TrainingEnrollment $enrollment = null;
 
     public function getEnrollment(): ?TrainingEnrollment
@@ -59,7 +59,7 @@ class TrainingCertificate
     }
 
     #[ORM\ManyToOne(targetEntity: TrainingCourse::class, inversedBy: 'certificates')]
-    #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id')]
+    #[ORM\JoinColumn(name: 'course_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?TrainingCourse $course = null;
 
     public function getCourse(): ?TrainingCourse
@@ -110,15 +110,16 @@ class TrainingCertificate
         return $this->getIssued_at();
     }
 
-    public function setIssued_at(\DateTimeInterface $issued_at): self
+    /** @internal Timestamp — set once */
+    public function initIssued_at(\DateTimeInterface $issued_at): self
     {
         $this->issued_at = $issued_at;
         return $this;
     }
 
-    public function setIssuedAt(\DateTimeInterface $issued_at): self
+    public function initIssuedAt(\DateTimeInterface $issued_at): self
     {
-        return $this->setIssued_at($issued_at);
+        return $this->initIssued_at($issued_at);
     }
 
     #[ORM\Column(type: 'integer', nullable: true)]
@@ -182,15 +183,16 @@ class TrainingCertificate
         return $this->getSigned_at();
     }
 
-    public function setSigned_at(?\DateTimeInterface $signed_at): self
+    /** @internal Timestamp — set once */
+    public function initSigned_at(?\DateTimeInterface $signed_at): self
     {
         $this->signed_at = $signed_at;
         return $this;
     }
 
-    public function setSignedAt(?\DateTimeInterface $signed_at): self
+    public function initSignedAt(?\DateTimeInterface $signed_at): self
     {
-        return $this->setSigned_at($signed_at);
+        return $this->initSigned_at($signed_at);
     }
 
 }

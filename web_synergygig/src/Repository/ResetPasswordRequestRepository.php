@@ -3,12 +3,14 @@
 namespace App\Repository;
 
 use App\Entity\ResetPasswordRequest;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use SymfonyCasts\Bundle\ResetPassword\Model\ResetPasswordRequestInterface;
 use SymfonyCasts\Bundle\ResetPassword\Persistence\Repository\ResetPasswordRequestRepositoryTrait;
 use SymfonyCasts\Bundle\ResetPassword\Persistence\ResetPasswordRequestRepositoryInterface;
 
+/** @extends ServiceEntityRepository<ResetPasswordRequest> */
 class ResetPasswordRequestRepository extends ServiceEntityRepository implements ResetPasswordRequestRepositoryInterface
 {
     use ResetPasswordRequestRepositoryTrait;
@@ -24,6 +26,11 @@ class ResetPasswordRequestRepository extends ServiceEntityRepository implements 
         string $selector,
         string $hashedToken
     ): ResetPasswordRequestInterface {
+        if (!$user instanceof User) {
+            throw new \InvalidArgumentException('Reset password requests require an App\\Entity\\User.');
+        }
         return new ResetPasswordRequest($user, $expiresAt, $selector, $hashedToken);
     }
 }
+
+

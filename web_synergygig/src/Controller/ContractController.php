@@ -57,7 +57,6 @@ class ContractController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $contract->setCreatedAt(new \DateTime());
             $contract->setStatus($contract->getStatus() ?? 'DRAFT');
             $em->persist($contract);
             $em->flush();
@@ -111,7 +110,7 @@ class ContractController extends AbstractController
         if (!$this->isGranted('ROLE_ADMIN') && !$this->isGranted('ROLE_HR') && $contract->getOwner()?->getId() !== $this->getUser()?->getId()) {
             throw $this->createAccessDeniedException('You can only delete your own contracts.');
         }
-        if ($this->isCsrfTokenValid('delete' . $contract->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $contract->getId(), (string) $request->request->get('_token'))) {
             $em->remove($contract);
             $em->flush();
             $this->addFlash('success', 'Contract deleted.');
@@ -122,7 +121,7 @@ class ContractController extends AbstractController
     #[Route('/{id}/negotiate', name: 'app_contract_negotiate', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function negotiate(Contract $contract, Request $request, EntityManagerInterface $em, ValidatorInterface $validator): Response
     {
-        if (!$this->isCsrfTokenValid('negotiate' . $contract->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('negotiate' . $contract->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
@@ -142,7 +141,7 @@ class ContractController extends AbstractController
                 $this->addFlash('error', 'Counter amount is too large.');
                 return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
             }
-            $contract->setCounterAmount($counterAmount);
+            $contract->setCounterAmount((string) $counterAmount);
         }
 
         // Validate counter terms
@@ -191,14 +190,14 @@ class ContractController extends AbstractController
     #[Route('/{id}/sign', name: 'app_contract_sign', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function sign(Contract $contract, Request $request, EntityManagerInterface $em, N8nWebhookService $n8n, NotificationService $notifier, HttpClientInterface $httpClient): Response
     {
-        if (!$this->isCsrfTokenValid('sign' . $contract->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('sign' . $contract->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
 
-        $signatureData = $request->request->get('signature_data', '');
+        $signatureData = (string) $request->request->get('signature_data', '');
 
-        if (empty($signatureData) || strlen($signatureData) < 100) {
+        if ($signatureData === '' || strlen($signatureData) < 100) {
             $this->addFlash('error', 'Please draw your signature before signing.');
             return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
@@ -210,7 +209,7 @@ class ContractController extends AbstractController
         }
 
         $contract->setSignatureData($signatureData);
-        $contract->setSignedAt(new \DateTime());
+        $contract->initSignedAt(new \DateTime());
         $contract->setStatus('ACTIVE');
 
         // Generate a simple blockchain-like hash for verification
@@ -228,16 +227,20 @@ class ContractController extends AbstractController
             ? $contract->getApplicant()->getFirstName() . ' ' . $contract->getApplicant()->getLastName()
             : 'N/A';
 
+        $offerTitle = $contract->getOffer() && $contract->getOffer()->getTitle()
+            ? (string) $contract->getOffer()->getTitle()
+            : 'Contract';
+
         $n8n->contractSigned(
-            $contract->getId(),
-            $contract->getOffer() ? $contract->getOffer()->getTitle() : 'Contract',
+            (int) $contract->getId(),
+            $offerTitle,
             $candidateName,
             (float) ($contract->getAmount() ?? 0)
         );
 
         $emailSent = false;
         if ($contract->getApplicant()) {
-            $notifier->contractSigned($contract->getApplicant(), $contract->getId());
+            $notifier->contractSigned($contract->getApplicant(), (int) $contract->getId());
             $emailSent = $this->sendContractSignedEmail($httpClient, $contract);
         }
 
@@ -306,7 +309,7 @@ class ContractController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function generateAiDraft(Contract $contract, Request $request, EntityManagerInterface $em, AIService $ai): Response
     {
-        if (!$this->isCsrfTokenValid('ai_draft' . $contract->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('ai_draft' . $contract->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
@@ -314,13 +317,15 @@ class ContractController extends AbstractController
         $candidateName = $contract->getApplicant()
             ? $contract->getApplicant()->getFirstName() . ' ' . $contract->getApplicant()->getLastName()
             : 'Candidate';
-        $offerTitle = $contract->getOffer() ? $contract->getOffer()->getTitle() : 'Position';
+        $offerTitle = $contract->getOffer() && $contract->getOffer()->getTitle()
+            ? (string) $contract->getOffer()->getTitle()
+            : 'Position';
 
         $draft = $ai->generateContractDraft(
             $candidateName,
             $offerTitle,
             'GIG',
-            $contract->getAmount(),
+            (float) ($contract->getAmount() ?? 0),
             $contract->getStartDate(),
             $contract->getEndDate()
         );
@@ -336,7 +341,7 @@ class ContractController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function sendEmail(Contract $contract, Request $request, HttpClientInterface $httpClient): Response
     {
-        if (!$this->isCsrfTokenValid('send_email' . $contract->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('send_email' . $contract->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid security token.');
             return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
@@ -395,7 +400,7 @@ class ContractController extends AbstractController
 
             $candidateName = $applicant->getFirstName() . ' ' . $applicant->getLastName();
             $position = $contract->getOffer() ? $contract->getOffer()->getTitle() : 'Contract';
-            $amount = $contract->getAmount() ? number_format($contract->getAmount(), 2) . ' ' . ($contract->getCurrency() ?? 'USD') : 'N/A';
+            $amount = $contract->getAmount() ? number_format((float) $contract->getAmount(), 2) . ' ' . ($contract->getCurrency() ?? 'USD') : 'N/A';
             $startDate = $contract->getStartDate() ? $contract->getStartDate()->format('M d, Y') : 'N/A';
             $endDate = $contract->getEndDate() ? $contract->getEndDate()->format('M d, Y') : 'N/A';
             $signedAt = $contract->getSignedAt() ? $contract->getSignedAt()->format('M d, Y H:i') . ' UTC' : 'N/A';
@@ -614,7 +619,8 @@ HTML;
         return '';
     }
 
-    private function calculateRiskScore(Contract $contract): array    {
+    /** @return array{score:int,factors:string} */
+    private function calculateRiskScore(Contract $contract): array{
         $score = 0;
         $factors = [];
 

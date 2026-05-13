@@ -32,6 +32,9 @@ class N8nWebhookService
     {
         $correlationId = $data['correlation_id'] ?? uniqid('sg_', true);
         $body = json_encode($data);
+        if ($body === false) {
+            throw new \RuntimeException('Unable to encode webhook payload.');
+        }
         $signature = 'sha256=' . hash_hmac('sha256', $body, $this->webhookSecret);
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {

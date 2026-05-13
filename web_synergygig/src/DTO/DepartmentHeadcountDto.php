@@ -5,7 +5,7 @@ namespace App\DTO;
 class DepartmentHeadcountDto
 {
     public function __construct(
-        public string $departmentName,
+        public ?string $departmentName,
         public int $employeeCount
     ) {
     }

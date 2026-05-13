@@ -26,7 +26,7 @@ class EmployeeOfMonthController extends AbstractController
 
         $scores = [];
         foreach ($tasks as $task) {
-            $assignee = $task->getAssignee();
+            $assignee = $task->getAssignedTo();
             if (!$assignee) continue;
 
             $uid = $assignee->getId();
@@ -76,23 +76,25 @@ class EmployeeOfMonthController extends AbstractController
     #[Route('/post', name: 'app_employee_of_month_post', methods: ['POST'])]
     public function postToCommunity(Request $request, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('eom_post', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('eom_post', (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_employee_of_month');
         }
 
-        $text = trim($request->request->get('announcement', ''));
+        $text = trim((string) $request->request->get('announcement', ''));
         if (strlen($text) < 10) {
             $this->addFlash('error', 'Announcement text is too short.');
             return $this->redirectToRoute('app_employee_of_month');
         }
 
         $post = new Post();
-        $post->setUser($this->getUser());
+        $currentUser = $this->getUser();
+        if (!$currentUser instanceof \App\Entity\User) {
+            throw $this->createAccessDeniedException('Invalid authenticated user.');
+        }
+        $post->initAuthor($currentUser);
         $post->setContent($text);
         $post->setVisibility('PUBLIC');
-        $post->setCreatedAt(new \DateTime());
-
         $em->persist($post);
         $em->flush();
 

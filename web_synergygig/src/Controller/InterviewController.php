@@ -37,13 +37,13 @@ class InterviewController extends AbstractController
                ->setParameter('user', $this->getUser());
         }
 
-        $status = $request->query->get('status');
-        if ($status) {
+        $status = trim((string) $request->query->get('status', ''));
+        if ($status !== '') {
             $qb->andWhere('i.status = :status')->setParameter('status', $status);
         }
 
-        $q = $request->query->get('q');
-        if ($q) {
+        $q = trim((string) $request->query->get('q', ''));
+        if ($q !== '') {
             $qb->andWhere('LOWER(c.first_name) LIKE :q OR LOWER(c.last_name) LIKE :q OR LOWER(o.title) LIKE :q')
                ->setParameter('q', '%' . mb_strtolower($q) . '%');
         }
@@ -62,7 +62,7 @@ class InterviewController extends AbstractController
         $interview = new Interview();
 
         // Pre-fill organizer with current HR user
-        $interview->setOrganizer($this->getUser());
+        $interview->setOrganizer($this->getUser() instanceof User ? $this->getUser() : null);
 
         // Pre-fill candidate from query param (e.g. after accepting an application)
         $candidateId = $request->query->get('candidate');
@@ -86,7 +86,6 @@ class InterviewController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $interview->setCreatedAt(new \DateTime());
             $em->persist($interview);
             $em->flush();
             $this->addFlash('success', 'Interview scheduled.');
@@ -131,7 +130,7 @@ class InterviewController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function delete(Request $request, Interview $interview, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete' . $interview->getId(), $request->request->get('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $interview->getId(), (string) $request->request->get('_token'))) {
             $em->remove($interview);
             $em->flush();
             $this->addFlash('success', 'Interview deleted.');
@@ -149,7 +148,7 @@ class InterviewController extends AbstractController
         NotificationService $notifier,
         ContractRepository $contractRepo
     ): Response {
-        if (!$this->isCsrfTokenValid('accept' . $interview->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('accept' . $interview->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_interview_index');
         }
@@ -176,9 +175,8 @@ class InterviewController extends AbstractController
                 $contract = new Contract();
                 $contract->setApplicant($candidate);
                 $contract->setOffer($offer);
-                $contract->setOwner($this->getUser());
+                $contract->setOwner($this->getUser() instanceof User ? $this->getUser() : null);
                 $contract->setStatus('DRAFT');
-                $contract->setCreatedAt(new \DateTime());
                 $contract->setCurrency('USD');
                 if ($offer->getAmount()) {
                     $contract->setAmount($offer->getAmount());
@@ -193,11 +191,12 @@ class InterviewController extends AbstractController
 
         // ── Notify candidate ──
         if ($candidate) {
+            $offerTitle = $offer && $offer->getTitle() ? (string) $offer->getTitle() : 'your interview';
             $notifier->interviewAccepted(
                 $candidate,
-                $interview->getId(),
-                $offer ? $offer->getTitle() : 'your interview',
-                $contract?->getId()
+                (int) $interview->getId(),
+                $offerTitle,
+                (int) ($contract?->getId() ?? 0)
             );
         }
 
@@ -208,13 +207,13 @@ class InterviewController extends AbstractController
                 : 'HR';
 
             $n8n->interviewAccepted(
-                $interview->getId(),
-                $candidate->getId(),
+                (int) $interview->getId(),
+                (int) $candidate->getId(),
                 $candidate->getFirstName() . ' ' . $candidate->getLastName(),
                 $candidate->getEmail() ?? '',
-                $offer->getId(),
-                $offer->getTitle(),
-                $contract->getId(),
+                (int) $offer->getId(),
+                (string) $offer->getTitle(),
+                (int) $contract->getId(),
                 $acceptedBy
             );
         }
@@ -227,7 +226,7 @@ class InterviewController extends AbstractController
     #[IsGranted('ROLE_HR')]
     public function decline(Request $request, Interview $interview, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('decline' . $interview->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('decline' . $interview->getId(), (string) $request->request->get('_token'))) {
             $this->addFlash('error', 'Invalid CSRF token.');
             return $this->redirectToRoute('app_interview_index');
         }

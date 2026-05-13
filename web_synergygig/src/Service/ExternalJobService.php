@@ -220,7 +220,8 @@ class ExternalJobService
             return null;
         }
 
-        return json_decode($response, true);
+        $data = json_decode((string) $response, true);
+        return is_array($data) ? $data : null;
     }
 
     /**
